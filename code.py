@@ -42,7 +42,7 @@ while True:
     for sensor in xbx_devices.initialized_sensors:
         measurement = sensor.get_measurement()
         measurement_json = json.dumps(measurement.__dict__)
-        xbx_comms.mqtt_client.publish(topic=f"{os.getenv('DEVICE_ID')}/readings/{sensor.topic}", msg=measurement_json)
-        logger.info(f"Published message to {os.getenv('DEVICE_ID')}/readings/{sensor.topic}: {measurement_json}")
+        xbx_comms.mqtt_client.publish(topic=f"XBX/{os.getenv('DEVICE_ID')}/readings/{sensor.topic}", msg=measurement_json)
+        logger.info(f"Published message to XBX/{os.getenv('DEVICE_ID')}/readings/{sensor.topic}: {measurement_json}")
 
     time.sleep(1)
