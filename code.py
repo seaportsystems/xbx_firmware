@@ -1,4 +1,3 @@
-
 import adafruit_logging as logging
 import sys
 
@@ -10,22 +9,10 @@ logger.info("Initializing...")
 import board
 import json
 import os
+import random
 import sdcardio
 import storage
 import time
-
-import xbx_busses
-
-# Initialize SD Card
-try:
-    logger.info("Initializing SD Card")
-    sd_card = sdcardio.SDCard(xbx_busses.spi_bus, board.GP28)
-    vfs = storage.VfsFat(sd_card)
-    storage.mount(vfs, '/sd')
-    logger.info("Successfully initialized SD Card")
-
-except Exception as e:
-    logger.error(f"Failed to initialize SD Card: {e}")
 
 # Start logging to file
 try:
@@ -34,15 +21,25 @@ try:
 except Exception as e:
     logger.warning(f"Failed to add FileHandler to logger: {e}")
 
+import xbx_busses
 import xbx_devices
-import xbx_comms
 
-# Main Loop
-while True:
-    for sensor in xbx_devices.initialized_sensors:
-        measurement = sensor.get_measurement()
-        measurement_json = json.dumps(measurement.__dict__)
-        xbx_comms.mqtt_client.publish(topic=f"XBX/{os.getenv('DEVICE_ID')}/readings/{sensor.topic}", msg=measurement_json)
-        logger.info(f"Published message to XBX/{os.getenv('DEVICE_ID')}/readings/{sensor.topic}: {measurement_json}")
+import seaport_systems_bg95m3 as bg95m3
 
-    time.sleep(1)
+modem = bg95m3.BG95M3(xbx_busses.uart_bus)
+
+s = modem.create_mqtt_connection(f"xbx_devkit_{random.randint(0,99)}", "a2jgs36qfd35dk-ats.iot.us-east-2.amazonaws.com", port=8883)
+print("Openning Socket")
+s.open()
+print("Connecting to MQTT Broker")
+s.connect()
+
+s.publish(1, 1, "xbx_devkit/log", "Hello from XBX")
+time.sleep(1)
+s.publish(1, 1, "xbx_devkit/log", "Hello from XBX")
+time.sleep(1)
+s.publish(1, 1, "xbx_devkit/log", "Hello from XBX")
+s.publish(1, 1, "xbx_devkit/log", "Disconnecting now...")
+
+s.disconnect()
+s.close()

@@ -30,7 +30,7 @@ except Exception as e:
 # Initialize UART Bus
 try:
     logger.info("Initializing UART Bus")
-    uart_bus = busio.UART(tx=board.GP0, rx=board.GP1, baudrate=115200, timeout=10)
+    uart_bus = busio.UART(tx=board.GP0, rx=board.GP1, baudrate=115200, timeout=10, receiver_buffer_size=2048)
     logger.info("Successfully initialized UART Bus")
 
 except:
