@@ -1,0 +1,18 @@
+{
+    "python.languageServer": "Pylance",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none",
+        "reportShadowedImports": "none"
+    },
+    "circuitpython.board.version": null,
+    "emeraldwalk.runonsave": {
+        "autoShowOutputPanel": "always",
+        "commands": [
+            {
+                "match": ".*",
+                "cmd": "cp ${file} /Volumes/CIRCUITPY/${relativeFile}",
+                "messageAfter": "Copied to CIRCUITPY
+            }
+        ]
+    }
+}
