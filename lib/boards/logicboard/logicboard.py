@@ -122,7 +122,7 @@ class LogicBoard():
         # Initialize RTC
         logger.info("Initializing RTC")
         try:
-            self.RTC = RTC(self.i2c_bus)
+            self.rtc = RTC(self.i2c_bus)
             logger.info("Successfully initialized RTC")
         except Exception as e:
             logger.info(f"Failed to initialize RTC: {e}")
@@ -132,7 +132,7 @@ class LogicBoard():
         try:
             self.OnboardRTC = rtc.RTC()
             logger.info("Successfully initialized Onboard RTC")
-            self.OnboardRTC.datetime = self.RTC.datetime
+            self.OnboardRTC.datetime = self.rtc.datetime
             logger.info("Successfully synced Logicboard RTC and Onboard RTC")
         except Exception as e:
             logger.info(f"Failed to initialize Onboard RTC: {e}")
