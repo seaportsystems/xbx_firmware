@@ -6,7 +6,8 @@ import ssl
 import sys
 import time
 import wifi
-            
+import gc
+
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 logger.setLevel(logging.DEBUG)
@@ -42,11 +43,12 @@ try:
         socket_pool=pool,
         ssl_context=ssl_context,
         is_ssl=True,
+        client_id=os.getenv("DEVICE_ID"),
         username="",  # AWS IoT does not require a username
         password="",  # AWS IoT does not require a password
     )
     logger.info("Successfully initialized MQTT Client")
-
+    mqtt_client.enable_logger(logging, 00, "mqttlogger")
     # Define MQTT event callbacks
     def connect(client, userdata, flags, rc):
         logger.info("Successfully connected to AWS IoT")
@@ -59,6 +61,10 @@ try:
 
     # Connect to AWS IoT
     logger.info("Connecting to AWS IoT...")
+    logger.info(f"Free blocks: {gc.mem_free()}")
+    logger.info("Collecting garbage")
+    gc.collect()
+    logger.info(f"Free blocks: {gc.mem_free()}")
     mqtt_client.connect()
 
     # Publish a message
