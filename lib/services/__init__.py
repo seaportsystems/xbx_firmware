@@ -49,6 +49,7 @@ try:
     )
     logger.info("Successfully initialized MQTT Client")
     mqtt_client.enable_logger(logging, 00, "mqttlogger")
+    
     # Define MQTT event callbacks
     def connect(client, userdata, flags, rc):
         logger.info("Successfully connected to AWS IoT")
