@@ -11,4 +11,4 @@ from boards.attitudeboard.attitudeboard import AttitudeBoard
 # Module Initialization
 logicboard = LogicBoard()
 powerboard = PowerBoard(logicboard)
-# attitudeboard = AttitudeBoard(logicboard)
+attitudeboard = AttitudeBoard(logicboard)
