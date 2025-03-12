@@ -68,7 +68,7 @@ try:
     mqtt_client.connect()
 
     # Publish a message
-    mqtt_client.publish("xbxdevkit/system_log", "Connected to MQTT Broker")
+    mqtt_client.publish(f'XBX/os.getenv("DEVICE_ID")/log', "Connected to MQTT Broker")
     
 except Exception as e:
     logger.warning(f"Failed to initialize MQTT client: {e}")
