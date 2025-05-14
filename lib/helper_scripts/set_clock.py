@@ -31,6 +31,6 @@ try:
     rtc_instance = boards.logicboard.rtc
     rtc_instance.datetime = ntp_instance.datetime
     current_time = rtc_instance.datetime
-    logger.info(f"Successfully set device RTC to: {current_time.tm_hour:02d}:{current_time.tm_min:02d}:{current_time.tm_sec:02d}")
+    logger.info(f"Successfully set device RTC to: {current_time.tm_hour:02d} :{current_time.tm_min:02d}:{current_time.tm_sec:02d}")
 except Exception as e:
     logger.warning(f"Failed to sync time wtih NTP server: {e}")
