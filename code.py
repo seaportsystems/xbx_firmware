@@ -24,6 +24,15 @@ while True:
     
     pressure = Reading(boards.attitudeboard.barometer.pressure, "hPa", "Pressure")
     services.mqtt_client.publish(topic=f"XBX/{os.getenv('DEVICE_ID')}/readings/pressure", msg=json.dumps(pressure.__dict__))
+
+    salinity = Reading(boards.atlassenseboard.EZOEC.EC, "uS/cm", "Salinity") 
+    services.mqtt_client.publish(topic=f"XBX/{os.getenv('DEVICE_ID')}/readings/salinity", msg=json.dumps(salinity.__dict__))
+    
+    dissolved_oxygen = Reading(boards.atlassenseboard.EZODO.MGL, "mg/l", "Dissolved Oxygen") 
+    services.mqtt_client.publish(topic=f"XBX/{os.getenv('DEVICE_ID')}/readings/dissolved_oxygen", msg=json.dumps(dissolved_oxygen.__dict__))
+    
+    water_temperature = Reading(boards.atlassenseboard.EZORTD.T, "C", "Water Temperature") 
+    services.mqtt_client.publish(topic=f"XBX/{os.getenv('DEVICE_ID')}/readings/water_temperature", msg=json.dumps(water_temperature.__dict__))
     
     ambient_temperature = Reading(boards.attitudeboard.barometer.temperature, "C", "Ambient Temperature")
     services.mqtt_client.publish(topic=f"XBX/{os.getenv('DEVICE_ID')}/readings/ambient_temperature", msg=json.dumps(ambient_temperature.__dict__))
@@ -39,5 +48,6 @@ while True:
     
     satellites = Reading(boards.attitudeboard.gps.latlon, "-", "Satellites in View") 
     services.mqtt_client.publish(topic=f"XBX/{os.getenv('DEVICE_ID')}/readings/satellites", msg=json.dumps(satellites.__dict__))
+    
     
     time.sleep(1)
