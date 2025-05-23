@@ -18,6 +18,7 @@ logger.setLevel(logging.DEBUG)
 modem = boards.logicboard.CellularModem
 mqtt_socket = modem.create_mqtt_connection(randint(0,1000), getenv("AWS_IOT_ENDPOINT"))
 mqtt_socket.open()
+time.sleep(5)
 mqtt_socket.connect()
 
 mqtt_socket.publish(1, 0, f"XBX/{getenv('DEVICE_ID')}/device", "Connected!")
