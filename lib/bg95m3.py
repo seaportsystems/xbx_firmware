@@ -31,6 +31,15 @@ class SSL_Context:
         self.renegotiation = 0
         self.dtls = 0
         self.dtlsversion = 2
+        
+        print("Syncing certs...")
+        try:
+            self.upload_cacert()
+            self.upload_device_cert()
+            self.upload_device_private_key()
+        except Exception as e:
+            print(f"Failed to automatically sync certs")
+            print("Try running: 'from helper_scripts import sync_certs' from the REPL")
     
     def upload_cacert(self, new_ca_cert_path=os.getenv('CA_CERT_PATH')):
         #Delete old cacert.pem
