@@ -13,5 +13,5 @@ from boards.atlassenseboard.atlassenseboard import AtlasSenseBoard
 # Module Initialization
 logicboard = LogicBoard()
 # powerboard = PowerBoard(logicboard)
-# attitudeboard = AttitudeBoard(logicboard)
-# atlassenseboard = AtlasSenseBoard(logicboard)
+attitudeboard = AttitudeBoard(logicboard)
+atlassenseboard = AtlasSenseBoard(logicboard)

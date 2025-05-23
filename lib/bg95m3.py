@@ -134,7 +134,7 @@ class MQTT_Socket:
             
             while True:             
                 if(self.is_socket_open()):
-                    print("Socket opened")
+                    print(f"Socket opened: {response}")
                     break
                 else:
                     print(f"Socket not opened...")
@@ -179,7 +179,7 @@ class MQTT_Socket:
         while retries > 0:
             print(f"Connecting to MQTT Broker. Retries remaining: {retries}")
             #Try to connect to broker
-            response = self.modem.send_comm_get_response(f'AT+QMTCONN={self.socket_id},"{self.client_id}"')
+            response = self.modem.send_comm_get_response(f'AT+QMTCONN={self.socket_id},"{self.client_id}"', 10)
 
             #Check that the connect command was RECEIVED AND PARSED successfully
             if(response['status_code'] == Status.OK):
@@ -200,7 +200,7 @@ class MQTT_Socket:
 
                     return {'socket_id': parsed_response[0], 'result': parsed_response[1]}
             else:
-                print("Error connecting...")
+                print(f"Error connecting: {response}")
                 print("Retrying in 5 seconds...")
                 time.sleep(5)
                 retries = retries - 1
@@ -292,7 +292,7 @@ class MQTT_Socket:
                 if(parsed_response[2] == 0):
                     return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2]}
                 
-    def publish(self, qos, retain, topic, msg):
+    def publish(self, topic, msg, qos=1, retain=0):
         if(not self.is_mqtt_connected()):
             raise RuntimeError("MQTT isn't connected")
         
@@ -488,8 +488,6 @@ class BG95M3:
         error_pattern = re.compile(r"ERROR$")
         cme_error_pattern = re.compile(r"^\+CME ERROR: (.*)$")
         cms_error_pattern = re.compile(r"^\+CMS ERROR: (.*)$")
-
-        print(timeout)
         
         #Waits for OK, ERROR or +CME ERROR: message, or returns timeout error
         while True:
@@ -538,7 +536,7 @@ class BG95M3:
 
         timer = time.time()
 
-        print(timeout)
+        
         
         #Waits for OK, ERROR or +CME ERROR: message, or returns timeout error
         while True:
@@ -598,7 +596,7 @@ class BG95M3:
     def send_comm_get_response(self, command, endline='\r', timeout=5):
         self.send_comm(command, endline)
         time.sleep(.1)
-        print(timeout)
+        
         return self.get_response(timeout=timeout)
     
     def check_communication(self):
