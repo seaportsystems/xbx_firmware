@@ -1,9 +1,10 @@
 import adafruit_logging as logging
 import adafruit_max1704x
-import sys
+from sys import stdout
+import gc
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.addHandler(logging.StreamHandler(stdout))
 logger.setLevel(logging.DEBUG)
 
 class BatteryMonitor():
@@ -56,3 +57,5 @@ class PowerBoard():
             
         except Exception as e:
             logger.error(f"Failed to initialize Battery Monitor: {e}")
+            
+        gc.collect()

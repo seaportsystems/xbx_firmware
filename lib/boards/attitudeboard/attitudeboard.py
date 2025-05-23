@@ -2,10 +2,11 @@ import adafruit_gps
 import adafruit_logging as logging
 import adafruit_lps2x
 import adafruit_lsm9ds1
-import sys
+from sys import stdout
+import gc
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+logger.addHandler(logging.StreamHandler(stdout))
 logger.setLevel(logging.DEBUG)
 
 class GPS():
@@ -107,3 +108,4 @@ class AttitudeBoard():
         self.imu = IMU(self.i2c_bus)
         self.barometer = Barometer(self.i2c_bus)
         self.gps = GPS(self.uart_bus)
+        gc.collect()
