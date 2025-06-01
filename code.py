@@ -17,7 +17,7 @@ logger.setLevel(logging.DEBUG)
 modem = boards.logicboard.CellularModem
 
 print("Creating MQTT Connection")
-mqtt_socket = modem.create_mqtt_connection(randint(0,1000), getenv("AWS_IOT_ENDPOINT"))
+mqtt_socket = modem.create_mqtt_connection(getenv("DEVICE_ID"), getenv("AWS_IOT_ENDPOINT"))
 
 while True:
     print("")

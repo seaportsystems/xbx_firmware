@@ -154,7 +154,7 @@ class MQTT_Socket:
             
     def close(self):
         #Check for open connections
-        if(self.is_mqtt_connected()):
+        if(self.is_connected()):
             self.disconnect()
                
         #Try to open the connection
@@ -189,6 +189,7 @@ class MQTT_Socket:
         while retries > 0:
             print(f"Connecting to MQTT Broker. Retries remaining: {retries}")
             #Try to connect to broker
+            print(f'AT+QMTCONN={self.socket_id},"{self.client_id}"')
             response = self.modem.send_comm_get_response(f'AT+QMTCONN={self.socket_id},"{self.client_id}"', 10)
             
             #Check that the connect command was RECEIVED AND PARSED successfully
@@ -249,7 +250,7 @@ class MQTT_Socket:
                 pass
         
     def subscribe(self, topic, qos):
-        if(not self.is_mqtt_connected()):
+        if(not self.is_connected()):
             raise RuntimeError("MQTT isn't connected")
         
         msg_id = randint(0,65535)
@@ -280,7 +281,7 @@ class MQTT_Socket:
                 pass
 
     def unsubscribe(self, topic):
-        if(not self.is_mqtt_connected()):
+        if(not self.is_connected()):
             raise RuntimeError("MQTT isn't connected")
         
         msg_id = randint(0,65535)
@@ -303,7 +304,7 @@ class MQTT_Socket:
                     return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2]}
                 
     def publish(self, topic, msg, qos=1, retain=0):
-        if(not self.is_mqtt_connected()):
+        if(not self.is_connected()):
             raise RuntimeError("MQTT isn't connected")
         
         msg_id = randint(0,65535)
@@ -331,7 +332,7 @@ class MQTT_Socket:
                 pass
 
     def read(self):
-        if(not self.is_mqtt_connected()):
+        if(not self.is_connected()):
             raise RuntimeError("MQTT isn't connected")
         
         response = self.modem.send_comm_get_response(f'AT+QMTRECV={self.socket_id}')
