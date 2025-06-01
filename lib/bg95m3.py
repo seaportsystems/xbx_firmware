@@ -123,7 +123,7 @@ class MQTT_Socket:
         self.client_id = client_id
         self.hostname = hostname
         self.port = port
-        self.socket_id = socket_id  #socket_id in modem docs
+        self.socket_id = socket_id  #client_idx in modem docs
     
         #Set default SSL context to use SSL/TLS and certificates
         default_ssl_context = SSL_Context(self.modem, ssl_context_id=2)
@@ -134,23 +134,24 @@ class MQTT_Socket:
         
     #open socket, connect, do your thing, disconnect, close
     def open(self):
+        if(not self.modem.is_comms_ready()):
+            raise ConnectionError("Modem not connected...")
+        
         print(f'Open Command: AT+QMTOPEN={self.socket_id},"{self.hostname}",{self.port}')
         response = self.modem.send_comm_get_response(f'AT+QMTOPEN={self.socket_id},"{self.hostname}",{self.port}', timeout=30)
 
         #Check that the open connection command was RECEIVED AND PARSED successfully
         if(response['status_code'] == Status.OK):
             print("Waiting for socket to open...")
-            
-            while True:             
-                if(self.is_socket_open()):
-                    print(f"Socket opened: {response}")
-                    break
-                else:
-                    print(f"Socket not opened...")
-                    time.sleep(1)
+            pattern = re.compile(r"^\+QMTOPEN: (.*)$")
+
+            #Wait for a +QMTOPEN: message
+            open_result_response = self.modem.wait_for_response(pattern, timeout=30)
+            print(f"Open Result Response: {open_result_response}")
+
         else:
             print(response)
-    
+            
     def close(self):
         #Check for open connections
         if(self.is_mqtt_connected()):
@@ -182,14 +183,14 @@ class MQTT_Socket:
                 return False
     
     def connect(self, retries=3):
-        if(not self.is_socket_open()):
+        if(not self.is_open()):
             raise RuntimeError("Socket isn't open, can't attempt to connect")
         
         while retries > 0:
             print(f"Connecting to MQTT Broker. Retries remaining: {retries}")
             #Try to connect to broker
             response = self.modem.send_comm_get_response(f'AT+QMTCONN={self.socket_id},"{self.client_id}"', 10)
-
+            
             #Check that the connect command was RECEIVED AND PARSED successfully
             if(response['status_code'] == Status.OK):
                 print("Waiting to establish connection to broker...")
@@ -362,13 +363,12 @@ class MQTT_Socket:
             if(self.socket_id in open_socket_ids):
                 return True
             else:
-                print(f"Open Socket IDs: {open_socket_ids}")
                 return False
         
         else:
             print("Error")
     
-    def is_socket_open(self):
+    def is_open(self):
         return self.get_mqtt_socket_state()
     
     def get_mqtt_connection_state(self):
@@ -376,7 +376,6 @@ class MQTT_Socket:
         
         if(response['status_code'] == Status.OK):
             pattern = re.compile(r"^\+QMTCONN: (.*)$")
-            print(f"AT+QMTCONN?: {response}")
             parsed_responses = self.modem.parse_response_data(response['data'], pattern)
             socket_states = {}
             
@@ -391,7 +390,7 @@ class MQTT_Socket:
         else:
             print("Error")
             
-    def is_mqtt_connected(self):
+    def is_connected(self):
         state = self.get_mqtt_connection_state()
         
         if state == 3:
@@ -410,12 +409,24 @@ class BG95M3:
 
         self.power_on()
 
+        retries = 0
+        max_retries = 3
+
         while not self.check_communication():
             print("Waiting for device to initialize")
+            retries += 1
+            if retries >= max_retries:
+                print("Communication failed. Restarting modem.")
+                self.restart()
+                retries = 0
+            time.sleep(1)
 
         print("Finding inherited sockets")
         self.mqtt_sockets = [MQTT_Socket(self, "Unknown", x['hostname'], x['port'], int(x['socket_id'])) for x in self.get_open_mqtt_sockets()]
         print("Closing inherited sockets:")
+        
+        print("Setting Echo Mode to OFF")
+        self.send_comm_get_response("ATE0")
         
         for socket in self.mqtt_sockets:
             socket.close()
@@ -423,6 +434,44 @@ class BG95M3:
         print(f"Device ICCID: {self.get_iccid()}")
         print("Device is ready")
 
+    #---SUPER HIGH LEVEL CHECKERS---#
+    def is_responsive(self):
+        return self.check_communication()
+    
+    def is_registered_to_network(self):
+        network_registration_status = self.get_network_registration_status()
+        
+        stat = network_registration_status.get('stat')
+        
+        if stat in [1, 5]:
+            return True
+        else:
+            return False
+        
+    def is_pds_connected(self):
+        packet_service_status = self.get_packet_service_status()
+        
+        connected = packet_service_status.get('state')
+        
+        if connected:
+            return True
+        else:
+            return False
+    
+    def is_pdp_connected(self):
+        pdp_status = self.get_pdp_status()
+        connected = pdp_status[0].get('state')
+        if connected:
+            return True
+        else:
+            return False
+        
+    def is_comms_ready(self):
+        if self.is_responsive() and self.is_registered_to_network() and self.is_pds_connected() and self.is_pdp_connected():
+            return True
+        else:
+            return False
+        
     #---HARDWARE---#
     def power_status_check(self):
         """
@@ -521,7 +570,7 @@ class BG95M3:
             #let the function process and filter all data before the end condition on its own
             for index, line in enumerate(response_lines):
                 if ok_pattern.match(line):
-                    print("Matched: OK")
+                    # print("Matched: OK")
                     return {"status": line, "status_code": Status.OK, "data": response_lines[:index], "response_line": line}
                 elif error_pattern.match(line):
                     print("Matched: ERROR")
@@ -544,8 +593,6 @@ class BG95M3:
         response_lines = []
 
         timer = time.time()
-
-        
         
         #Waits for OK, ERROR or +CME ERROR: message, or returns timeout error
         while True:
@@ -556,7 +603,7 @@ class BG95M3:
                     try:
                         i = self.uart_bus.in_waiting
                         response = self.uart_bus.read(self.uart_bus.in_waiting).decode("utf-8")
-                        print(f"Read {i} bytes: {response}")
+                        print(f"Read {i} bytes")
                     except:
                         pass
             else:
@@ -575,7 +622,7 @@ class BG95M3:
 
             for index, line in enumerate(response_lines):
                 if response_pattern.match(line):
-                    print("Matched: response_pattern")
+                    print(f"Matched: {response_pattern}")
                     return {"status": "OK", "status_code": Status.OK, "data": response_lines[:index], "response_line": line}
                 else:
                     print(f"Got line, but didn't match: {line}")
@@ -623,6 +670,10 @@ class BG95M3:
             return True
         else:
             return False
+    
+    @property
+    def is_ready():
+        pass
     
     #---BASIC DEVICE CONFIG---#
     def set_urc_indication_config(self, urc_type, enable, save=1):
@@ -931,7 +982,7 @@ class BG95M3:
         if(socket_id < 0 or socket_id > 5):
             raise ValueError(f"socket_id: {socket_id} is out of range 0-5")
         
-        socket = MQTT_Socket(self, socket_id, hostname, port, socket_id)
+        socket = MQTT_Socket(self, client_id, hostname, port, socket_id)
         
         self.mqtt_sockets.append(socket)
         
