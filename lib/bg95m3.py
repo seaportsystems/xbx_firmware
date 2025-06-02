@@ -24,13 +24,10 @@ class SSL_Context:
         self.clientkey = 'device_private_key.pem'
         self.seclevel = 2
         self.session = 0
-        self.sni = 0
+        self.sni = 1
         self.checkhost = 0
         self.ignorelocaltime = 1
-        self.negotiatetime = 300
         self.renegotiation = 0
-        self.dtls = 0
-        self.dtlsversion = 2
         
         print("Syncing certs...")
         try:
@@ -82,8 +79,7 @@ class SSL_Context:
             
     def set_context(self):
         print("Setting SSL Context")
-        
-
+    
         self.set_parameter("sslversion", self.sslversion)
         self.set_parameter("ciphersuite", self.ciphersuite)
         
@@ -97,17 +93,14 @@ class SSL_Context:
         self.set_parameter("sni", self.sni)
         self.set_parameter("checkhost", self.checkhost)
         self.set_parameter("ignorelocaltime", self.ignorelocaltime)
-        self.set_parameter("negotiatetime", self.negotiatetime)
         self.set_parameter("renegotiation", self.renegotiation)
-        self.set_parameter("dtls", self.dtls)
-        self.set_parameter("dtlsversion", self.dtlsversion)
 
     def set_parameter(self, key, value):
         response = self.modem.send_comm_get_response(f'AT+QSSLCFG="{key}", {self.ssl_context_id}, {value}')
 
         #Check that the open connection command was RECEIVED AND PARSED successfully
         if(response['status_code'] == Status.OK):
-            print("Successfully set value...")
+            print(f"Successfully set {key} to {value}...")
             return True
         
         elif(response['status_code'] == Status.ERROR):
@@ -130,7 +123,8 @@ class MQTT_Socket:
         default_ssl_context.set_context()
         
         #Use SSL context 2
-        self.modem.send_comm_get_response('AT+QMTCFG="ssl",0,1,2')
+        print("Setting SSL Context")
+        self.modem.send_comm_get_response(f'AT+QMTCFG="ssl",{self.socket_id},1,2')
         
     #open socket, connect, do your thing, disconnect, close
     def open(self):
@@ -138,7 +132,7 @@ class MQTT_Socket:
             raise ConnectionError("Modem not connected...")
         
         print(f'Open Command: AT+QMTOPEN={self.socket_id},"{self.hostname}",{self.port}')
-        response = self.modem.send_comm_get_response(f'AT+QMTOPEN={self.socket_id},"{self.hostname}",{self.port}', timeout=30)
+        response = self.modem.send_comm_get_response(f'AT+QMTOPEN={self.socket_id},"{self.hostname}",{self.port}', timeout=60)
 
         #Check that the open connection command was RECEIVED AND PARSED successfully
         if(response['status_code'] == Status.OK):
@@ -146,7 +140,7 @@ class MQTT_Socket:
             pattern = re.compile(r"^\+QMTOPEN: (.*)$")
 
             #Wait for a +QMTOPEN: message
-            open_result_response = self.modem.wait_for_response(pattern, timeout=30)
+            open_result_response = self.modem.wait_for_response(pattern, timeout=60)
             print(f"Open Result Response: {open_result_response}")
 
         else:
@@ -190,7 +184,7 @@ class MQTT_Socket:
             print(f"Connecting to MQTT Broker. Retries remaining: {retries}")
             #Try to connect to broker
             print(f'AT+QMTCONN={self.socket_id},"{self.client_id}"')
-            response = self.modem.send_comm_get_response(f'AT+QMTCONN={self.socket_id},"{self.client_id}"', 10)
+            response = self.modem.send_comm_get_response(f'AT+QMTCONN={self.socket_id},"{self.client_id}"', timeout=30)
             
             #Check that the connect command was RECEIVED AND PARSED successfully
             if(response['status_code'] == Status.OK):
@@ -198,7 +192,7 @@ class MQTT_Socket:
                 pattern = re.compile(r"^\+QMTCONN: (.*)$")
 
                 #Wait for a +QMTCONN: message to check result of attempting to connect to broker
-                connect_result_response = self.modem.wait_for_response(pattern, timeout=30)
+                connect_result_response = self.modem.wait_for_response(pattern, timeout=120)
                 print(f"Connect Result Response: {connect_result_response}")
 
                 if(connect_result_response['status_code'] == Status.OK):
@@ -425,6 +419,14 @@ class BG95M3:
         print("Finding inherited sockets")
         self.mqtt_sockets = [MQTT_Socket(self, "Unknown", x['hostname'], x['port'], int(x['socket_id'])) for x in self.get_open_mqtt_sockets()]
         print("Closing inherited sockets:")
+        
+        # Clear any existing SSL contexts
+        print("Clearing existing SSL contexts...")
+        for ctx_id in range(0, 6):
+            try:
+                self.send_comm_get_response(f'AT+QSSLCLOSE={ctx_id}', timeout=5)
+            except:
+                pass
         
         print("Setting Echo Mode to OFF")
         self.send_comm_get_response("ATE0")
