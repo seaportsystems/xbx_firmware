@@ -45,9 +45,11 @@ while True:
                 mqtt_socket.connect()
             except:
                 print("Failed to connect...")
+                
         if(mqtt_socket.is_connected()):
             try:
-                mqtt_socket.publish(1, 0, f"XBX/{getenv('DEVICE_ID')}/device", "Connected!")
+                print(f"Attempting to publish message to: XBX/{getenv('DEVICE_ID')}/device")
+                mqtt_socket.publish(f"XBX/{getenv('DEVICE_ID')}/device", "Connected!")
             except Exception as e:
                 print(f"Failed to publish: {e}")
     
