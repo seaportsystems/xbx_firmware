@@ -120,13 +120,13 @@ class LogicBoard():
         except Exception as e:
             logger.error(f"Failed to initialize SD Card: {e}")
         
-        # Initialize Cellular Modem
-        logger.info("Initializing Cellular Modem")
-        try:
-            self.CellularModem = bg95m3.BG95M3(self.uart_bus)
-            logger.info("Successfully initialized Cellular Modem")
-        except Exception as e:
-            logger.info(f"Failed to initialize Cellular Modem: {e}")
+        # # Initialize Cellular Modem
+        # logger.info("Initializing Cellular Modem")
+        # try:
+        #     self.CellularModem = bg95m3.BG95M3(self.uart_bus)
+        #     logger.info("Successfully initialized Cellular Modem")
+        # except Exception as e:
+        #     logger.info(f"Failed to initialize Cellular Modem: {e}")
             
         # Initialize RTC
         logger.info("Initializing RTC")
