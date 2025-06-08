@@ -2,6 +2,7 @@ import os
 import time
 from re import sub
 from services.global_logger import logger
+from gc import collect
 
 logger.info("Initializing data logger")
 
@@ -21,6 +22,7 @@ class DataLogger:
             logger.info("Creating hrd directory doesn't exist...")
             os.mkdir("/sd/hrd")
             logger.info("hrd directory created...")
+            collect()
 
     def log_reading(self, reading):
         """
@@ -55,3 +57,5 @@ class DataLogger:
         except OSError:
             # If write fails (e.g., no SD card), silently ignore or handle as needed
             pass
+    
+    collect()

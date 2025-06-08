@@ -1,8 +1,11 @@
 import board
 import digitalio
+import gc
 import os
 import re
 import time
+
+gc.enable()
 
 from random import randint
 
@@ -420,6 +423,7 @@ class BG95M3:
         self.mqtt_sockets = [MQTT_Socket(self, "Unknown", x['hostname'], x['port'], int(x['socket_id'])) for x in self.get_open_mqtt_sockets()]
         print("Closing inherited sockets:")
         
+        gc.collect()
         # Clear any existing SSL contexts
         print("Clearing existing SSL contexts...")
         for ctx_id in range(0, 6):
@@ -428,15 +432,20 @@ class BG95M3:
             except:
                 pass
         
+        gc.collect()
+        
         print("Setting Echo Mode to OFF")
         self.send_comm_get_response("ATE0")
         
         for socket in self.mqtt_sockets:
             socket.close()
         
+        gc.collect()
+        
         print(f"Device ICCID: {self.get_iccid()}")
         print("Device is ready")
-
+        gc.collect()
+        
     #---SUPER HIGH LEVEL CHECKERS---#
     def is_responsive(self):
         return self.check_communication()
@@ -479,25 +488,22 @@ class BG95M3:
     def power_status_check(self):
         """
         Checks the current state of the modem (on/off).
-        Returns:
-            True if the modem is on, False if the modem is off.
         """
-        return not self.power_status.value  # Assuming the modem is on if HIGH (True)
+        return not self.power_status.value
 
     def toggle_power(self):
         """
         Toggles the modem's power button
         Returns: nothing
         """
-        self.power_button.value = True  # Set power button pin HIGH
-        time.sleep(1)  # Hold HIGH for 1 second to toggle power
-        self.power_button.value = False  # Release power button pin
-        time.sleep(0.5)  # Allow time for the modem to respond
+        self.power_button.value = True
+        time.sleep(1)
+        self.power_button.value = False
+        time.sleep(0.5)
 
     def power_on(self):
         """
         Turns the modem on by calling the power_toggle function with True.
-        Returns: nothing
         """
         current_state = self.power_status_check()
         
@@ -509,7 +515,6 @@ class BG95M3:
     def power_off(self):
         """
         Turns the modem off by calling the power_toggle function with False.
-        Returns: nothing
         """
         current_state = self.power_status_check()
         
@@ -521,7 +526,6 @@ class BG95M3:
     def restart(self):
         """
         Turns the modem off, then turns it back on again
-        Returns: nothing
         """
         self.power_off()
         time.sleep(1)
@@ -538,7 +542,6 @@ class BG95M3:
     def get_response(self, timeout=5):
         """
         Waits for a status response code: OK, ERROR, +CME ERROR: , +CMS ERROR: and returns all response lines before it
-        Returns: list of strings - response lines before status response code
         """
         response = ""
         response_lines = []
@@ -568,9 +571,6 @@ class BG95M3:
                 response_lines.extend([x for x in response.split("\r\n") if x != ""])
                 response = ""
 
-            #loop over all response lines to see if we've found a response code
-            #return all data from the time the original command was sent (presumably, buffer is cleared automatically when using send_comm())
-            #let the function process and filter all data before the end condition on its own
             for index, line in enumerate(response_lines):
                 if ok_pattern.match(line):
                     # print("Matched: OK")
@@ -588,9 +588,6 @@ class BG95M3:
     def wait_for_response(self, response_pattern, timeout=5):
         """
         Waits up to timeout duration, for a line from the uart_bus, matching regex response pattern
-        Can be used to retreive URC, data provided after a response code, or wait for an indicator to proceed with supplying data
-        Accepts: response_pattern: regex pattern
-        Returns: response line matching response_pattern
         """
         response = ""
         response_lines = []
@@ -617,12 +614,6 @@ class BG95M3:
                 response_lines.extend([x for x in response.split("\r\n") if x != ""])
                 response = ""
 
-            #loop over all response lines to see if we've found a line that matches response_pattern
-            #return all data from the time the original command was sent (presumably, buffer is cleared automatically when using send_comm())
-            #return response_line that matched the pattern
-            #let the function process and filter all data before the end condition on its own
-            #returns at the first possible chance, i.e. multiple URCs will NOT be caught/returned
-
             for index, line in enumerate(response_lines):
                 if response_pattern.match(line):
                     print(f"Matched: {response_pattern}")
@@ -633,13 +624,6 @@ class BG95M3:
     def parse_response_data(self, data, response_pattern):
         """
         Parses data for lines that match the response pattern, if a line matches the response pattern, it's data is split by ',' and appended to return data
-
-        Accepts:
-            data: list of lists
-            response_pattern: regex pattern
-
-        Returns:
-            list of strings
         """
 
         matched_data = []
@@ -661,11 +645,6 @@ class BG95M3:
     def check_communication(self):
         """
         Function for checking modem communication
-
-        Returns
-        -------
-        dict
-            Result that includes "status" and "response" keys
         """
         
         response = self.send_comm_get_response("AT")
@@ -883,13 +862,6 @@ class BG95M3:
     def get_file_list(self, path="*"):
         """
         Function for getting file list
-
-        Accepts:
-            path : str, default: "*"
-                Path to the directory
-
-        Returns:
-            dict
         """
         response = self.send_comm_get_response(f'AT+QFLST="{path}"')
         if(response['status_code'] == Status.OK):
@@ -902,12 +874,6 @@ class BG95M3:
     def delete_file_from_modem(self, file_name):
         """
         Function for deleting file from modem UFS storage
-
-        Accepts:
-        file_path : str - Path to the file
-
-        Returns:
-            dict - Result that includes "status" and "response" keys
         """
 
         response = self.send_comm_get_response(f'AT+QFDEL="{file_name}"')
@@ -920,13 +886,6 @@ class BG95M3:
     def upload_file_to_modem(self, filename, file, timeout=5000):
         """
         Function for uploading file to modem
-
-        Accepts:
-        file : str - Path to the file
-        timeout : int, default: 5000 - Timeout for the command
-
-        Returns:
-            dict - Result that includes "status" and "response" keys
         """
 
         self.send_comm(f'AT+QFUPL="{filename}",{len(file)},{timeout}')

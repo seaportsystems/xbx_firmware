@@ -1,14 +1,10 @@
-import adafruit_logging as logging
 import atlas_ezo_do
 import atlas_ezo_ec
 import atlas_ezo_rtd
-from sys import stdout
 import gc
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(stdout))
-logger.setLevel(logging.DEBUG)
-        
+from services.global_logger import logger
+
 class EZOEC():
     def __init__(self, i2c_bus):
         self.i2c_bus = i2c_bus
@@ -116,5 +112,5 @@ class AtlasSenseBoard():
         except Exception as e:
             logger.warning(f"Failed to initialize EZORTD: {e}")
             
-    logger.info("Successfully initialized AtlasSenseBoard")
-    gc.collect()
+        logger.info("Successfully initialized AtlasSenseBoard")
+        gc.collect()

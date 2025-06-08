@@ -1,33 +1,30 @@
-import adafruit_gps
-import adafruit_logging as logging
+# import adafruit_gps
 import adafruit_lps2x
 import adafruit_lsm9ds1
-from sys import stdout
 import gc
+gc.enable()
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(stdout))
-logger.setLevel(logging.DEBUG)
+from services.global_logger import logger
 
-class GPS():
-    def __init__(self, uart_bus):
-        self.uart_bus = uart_bus
-        self.base_device = adafruit_gps.GPS(self.uart_bus)
+# class GPS():
+#     def __init__(self, uart_bus):
+#         self.uart_bus = uart_bus
+#         self.base_device = adafruit_gps.GPS(self.uart_bus)
         
-    @property
-    def latlon(self):
-        return (self.base_device.latitude_degrees, self.base_device.longitude_degrees)
+#     @property
+#     def latlon(self):
+#         return (self.base_device.latitude_degrees, self.base_device.longitude_degrees)
         
-    @property
-    def hdop(self):
-        return self.base_device.hdop
+#     @property
+#     def hdop(self):
+#         return self.base_device.hdop
     
-    @property
-    def sats(self):
-        return self.base_device.satellites
+#     @property
+#     def sats(self):
+#         return self.base_device.satellites
     
-    def update(self):
-        self.base_device.update()
+#     def update(self):
+#         self.base_device.update()
         
 class IMU():
     def __init__(self, i2c_bus):
@@ -107,5 +104,5 @@ class AttitudeBoard():
         
         self.imu = IMU(self.i2c_bus)
         self.barometer = Barometer(self.i2c_bus)
-        self.gps = GPS(self.uart_bus)
+        # self.gps = GPS(self.uart_bus)
         gc.collect()

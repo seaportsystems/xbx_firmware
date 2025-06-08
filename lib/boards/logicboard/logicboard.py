@@ -1,6 +1,5 @@
 import adafruit_ds3231
-import bg95m3
-import adafruit_logging as logging
+from bg95m3 import BG95M3
 from adafruit_sdcard import SDCard
 import board
 from busio import SPI, I2C, UART
@@ -8,12 +7,10 @@ from digitalio import DigitalInOut, Direction
 from microcontroller import cpu
 import rtc
 from storage import VfsFat, mount
-from sys import stdout
 import gc
+gc.enable()
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler(stdout))
-logger.setLevel(logging.DEBUG)
+from services.global_logger import logger, log_to_sd
 
 class CPU():
     def __init__(self):
@@ -119,14 +116,17 @@ class LogicBoard():
                 
         except Exception as e:
             logger.error(f"Failed to initialize SD Card: {e}")
+        logger.info("Beginning log to SD Card")
         
-        # # Initialize Cellular Modem
-        # logger.info("Initializing Cellular Modem")
-        # try:
-        #     self.CellularModem = bg95m3.BG95M3(self.uart_bus)
-        #     logger.info("Successfully initialized Cellular Modem")
-        # except Exception as e:
-        #     logger.info(f"Failed to initialize Cellular Modem: {e}")
+        log_to_sd()
+        
+        # Initialize Cellular Modem
+        logger.info("Initializing Cellular Modem")
+        try:
+            self.CellularModem = BG95M3(self.uart_bus)
+            logger.info("Successfully initialized Cellular Modem")
+        except Exception as e:
+            logger.info(f"Failed to initialize Cellular Modem: {e}")
             
         # Initialize RTC
         logger.info("Initializing RTC")
