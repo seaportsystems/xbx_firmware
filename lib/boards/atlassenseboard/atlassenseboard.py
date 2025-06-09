@@ -12,9 +12,11 @@ class EZOEC():
         locked = False
         while(not(locked)):
             locked = self.i2c_bus.try_lock()
+            
         i2c_devices = self.i2c_bus.scan()
         self.i2c_bus.unlock()
         
+        logger.info(f"Devices on bus: {i2c_devices}")
         if(100 in i2c_devices):
             address = 100
         else:
@@ -45,9 +47,11 @@ class EZODO():
         locked = False
         while(not(locked)):
             locked = self.i2c_bus.try_lock()
+            
         i2c_devices = self.i2c_bus.scan()
         self.i2c_bus.unlock()
         
+        logger.info(f"Devices on bus: {i2c_devices}")
         if(97 in i2c_devices):
             address = 97
         else:
@@ -70,9 +74,11 @@ class EZORTD():
         locked = False
         while(not(locked)):
             locked = self.i2c_bus.try_lock()
+            
         i2c_devices = self.i2c_bus.scan()
         self.i2c_bus.unlock()
         
+        logger.info(f"Devices on bus: {i2c_devices}")
         if(102 in i2c_devices):
             address = 102
         else:
