@@ -5,6 +5,7 @@ from helper_scripts import i2c_scan
 '''
 
 import board
+import time
 from busio import I2C
 
 print("Initializing I2C Bus")
@@ -14,21 +15,19 @@ locked = False
 while(not(locked)):
     print("Waiting for bus lock")
     locked = i2c_bus.try_lock()
-    
-print("Bus locked successfully")
-print("Scanning bus")
-i2c_devices = i2c_bus.scan()
 
-print(f"{len(i2c_devices)} devices on the I2C bus")
-print("")
-print("Devices")
-print("-------")
+while True:    
+    print("Bus locked successfully")
+    print("Scanning bus")
+    i2c_devices = i2c_bus.scan()
 
-for d in i2c_devices:
-    print(f"{hex(d)} | {d}")
-    
-print("")
-print("Unlocking bus")
-i2c_bus.unlock()
-print("Deinitializing bus")
-i2c_bus.deinit()
+    print(f"{len(i2c_devices)} devices on the I2C bus")
+    print("")
+    print("Devices")
+    print("-------")
+
+    for d in i2c_devices:
+        print(f"{hex(d)} | {d}")
+        
+    print("")
+    time.sleep(1)
