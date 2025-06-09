@@ -27,6 +27,7 @@ print("-------")
 for d in i2c_devices:
     print(f"{hex(d)} | {d}")
     
+print("")
 print("Unlocking bus")
 i2c_bus.unlock()
 print("Deinitializing bus")
