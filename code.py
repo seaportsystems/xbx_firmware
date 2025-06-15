@@ -1,10 +1,17 @@
-import adafruit_logging as logging
+from microcontroller import watchdog
+from watchdog import WatchDogMode
+
+watchdog.timeout = 8
+watchdog.mode = None
+
 import boards
 from json import dumps, loads
 import os
 from reading import Reading
 from services.global_logger import logger
 from services.data_logger import DataLogger
+from services.device_manager import manager
+
 from sys import stdout
 import time
 import gc
@@ -14,8 +21,11 @@ gc.enable()
 # ---------------------------------------------------------------------
 # COMMS CONFIGURATION
 # ---------------------------------------------------------------------
-CELLULAR                 = 0
-WIFI                     = 1
+
+DISABLE                  = 0
+CELLULAR                 = 1
+WIFI                     = 2
+
 COMMS_MODE               = CELLULAR
 
 # ---------------------------------------------------------------------
@@ -71,8 +81,7 @@ def measure_mode():
     
     sample_readings = []
     
-    year, month, day, hour, minute, second, _, _, _ = time.localtime()
-    sample_filename = f"SF{year:04d}{month:02d}{day:02d}T{hour:02d}{minute:02d}{second:02d}"
+    sample_filename = f"tmp.sample"
     logger.info(f"Creating sample file: {sample_filename}")
     sample_file = open(f"/sd/sample_data/{sample_filename}", "w")
     logger.info("Created sample file")
@@ -80,42 +89,19 @@ def measure_mode():
     dl = DataLogger()
     
     samples_taken = 0
+    
+    sensors = ['attitudeboard.barometer', 'attitudeboard.imu', 'atlassenseboard.conductivity', 'atlassenseboard.dissolvedoxygen', 'atlassenseboard.watertemperature']
+
+    logger.info(manager.all_devices())
+    
     while samples_taken < SAMPLES:
-        accelerations = Reading(boards.attitudeboard.imu.accelerations, "m/s^2", "Acceleration Vector")
-        dl.log_reading(accelerations)
-        sample_readings.append(accelerations)
-        
-        rotations = Reading(boards.attitudeboard.imu.rotations, "rad/s", "Angular Velocity")
-        dl.log_reading(rotations)
-        sample_readings.append(rotations)
-        
-        magnetics = Reading(boards.attitudeboard.imu.magnetics, "uT", "Magnetic Field Vector")
-        dl.log_reading(magnetics)
-        sample_readings.append(magnetics)
-        
-        pressure = Reading(boards.attitudeboard.barometer.pressure, "hPa", "Pressure")
-        dl.log_reading(pressure)
-        sample_readings.append(pressure)
-        
-        salinity = Reading(boards.atlassenseboard.EZO_EC.EC, "uS/cm", "Salinity")
-        dl.log_reading(salinity)
-        sample_readings.append(salinity)
-        
-        dissolved_oxygen = Reading(boards.atlassenseboard.EZO_DO.MGL, "mg/l", "Dissolved Oxygen")
-        dl.log_reading(dissolved_oxygen)
-        sample_readings.append(dissolved_oxygen)
-        
-        water_temperature = Reading(boards.atlassenseboard.EZO_RTD.T, "C", "Water Temperature")
-        dl.log_reading(water_temperature)
-        sample_readings.append(water_temperature)
-        
-        ambient_temperature = Reading(boards.attitudeboard.barometer.temperature, "C", "Ambient Temperature")
-        dl.log_reading(ambient_temperature)
-        sample_readings.append(ambient_temperature)
-        
-        cpu_temperature = Reading(boards.logicboard.cpu.temperature, "C", "CPU Temperature")
-        dl.log_reading(cpu_temperature)
-        sample_readings.append(cpu_temperature)
+        for sensor in sensors:
+            all_readings = manager.devices[sensor].read()
+            
+            for r in all_readings.values(): 
+                logger.info(f"{sensor} - {r}")
+                dl.log_reading(r)
+                sample_readings.append(r)
     
         gc.collect()
         
@@ -126,8 +112,9 @@ def measure_mode():
     logger.info(f"Writing samples to: {sample_filename}")
 
     for r in sample_readings:
-        sample_file.write(dumps(r.__dict__))
-        sample_file.write("\n")
+        if(r is not None):
+            sample_file.write(dumps(r.__dict__))
+            sample_file.write("\n")
         
     logger.info(f"Closing sample file: {sample_filename}")
     sample_file.close()
@@ -138,6 +125,7 @@ def measure_mode():
     logger.info(f"Memory Free: {gc.mem_free()}")
     gc.collect()
     logger.info(f"Memory Free: {gc.mem_free()}")
+    
     return MODE_TRANSMIT
 
 
@@ -154,61 +142,47 @@ def transmit_mode():
     logger.info("Entering Transmit Mode")
     time.sleep(1)  # allow boot time
 
-    samples = os.listdir("/sd/sample_data/")
-    
-    for sample in samples:
-        with open(f"/sd/sample_data/{sample}", "r") as sample_file:
-            for line in sample_file:
-                print(line)
-                jsonline = loads(line)
-                logger.info(f"Publishing: {line} to XBX/{os.getenv('DEVICE_ID')}/{jsonline['description']}")
-                
+    #unsent_samples_file = open("/sd/sample_data/uss.sample", "r")
+    tmp_sample_file = open("/sd/sample_data/tmp.sample", "r")
         
-        gc.collect()
-                
-    if(COMMS_MODE == CELLULAR):
+    gc.collect()
+    
+    if(COMMS_MODE == DISABLE):
+        logger.info("Comms are disabled")
+        return MODE_DEEPSLEEP
+     
+    elif(COMMS_MODE == CELLULAR):
         start_time = time.monotonic()
         logger.info("Waiting for modem to warm up")
+        
         while time.monotonic() - start_time < MODEM_RESPONSE_TIMEOUT:
             if boards.logicboard.CellularModem.is_comms_ready():
                 logger.info(f"Modem Comms Ready: {boards.logicboard.CellularModem.is_comms_ready()}")
                 logger.info(f"Setting up MQTT Connection")
+                
                 mqtt_client = boards.logicboard.CellularModem.create_mqtt_connection(os.getenv("DEVICE_ID"), os.getenv("AWS_IOT_ENDPOINT"))
                 
                 if(not mqtt_client.is_open()):
-                    try:
-                        print("Attempting to open MQTT Connection")
-                        mqtt_client.open()
-                    except ConnectionError as exception:
-                        print("Failed to open MQTT socket")
+                    mqtt_client.open()
                 
                 if(not mqtt_client.is_connected()):
-                    try:
-                        print("Attempting to establish MQTT Connection")
-                        mqtt_client.connect()
-                    except:
-                        print("Failed to connect...")
+                    mqtt_client.connect()
                         
                 if(mqtt_client.is_connected()):
-                    try:
-                        print(f"Attempting to publish message to: XBX/{os.getenv('DEVICE_ID')}/device")
-                        mqtt_client.publish(f"XBX/{os.getenv('DEVICE_ID')}/device", "Connected!")
-    
-                        for sample in samples:
-                            with open(f"/sd/sample_data/{sample}", "r") as sample_file:
-                                for line in sample_file:
-                                    jsonline = loads(line)
-                                    mqtt_client.publish(f"XBX/{os.getenv('DEVICE_ID')}/{jsonline['description']}", line)
-                                    logger.info(f"Published: {line} to XBX/{os.getenv('DEVICE_ID')}/{jsonline['description']}")
-                                    
-                            logger.info(f"Deleting: {sample}")
-                            os.remove(f"/sd/sample_data/{sample}")
-                            logger.info(f"Deleted: {sample}")
-                                    
-                    except Exception as e:
-                        print(f"Failed to publish: {e}")
-            
+                    mqtt_client.publish(f"XBX/{os.getenv('DEVICE_ID')}/device", "Connected!")
+
+                    for line in tmp_sample_file:
+                        jsonline = loads(line)
+                        mqtt_client.publish(f"XBX/{os.getenv('DEVICE_ID')}/{jsonline['description']}", line)
+                
+                    mqtt_client.publish(f"XBX/{os.getenv('DEVICE_ID')}/device", "Disconnecting!")
+                    mqtt_client.disconnect()
+                    mqtt_client.close()
+                    
+                    return MODE_DEEPSLEEP
+                
                 break
+            
             else:
                 logger.info(f"Modem Responsive: {boards.logicboard.CellularModem.is_responsive()}")
                 logger.info(f"Modem Registered: {boards.logicboard.CellularModem.is_registered_to_network()}")
@@ -218,26 +192,20 @@ def transmit_mode():
                 
                 logger.info("Waiting for modem to be ready for comms")
                 time.sleep(1)
+                
+            
+            
         else:
             logger.warning("Modem failed to establish comms link...")
             return MODE_DEEPSLEEP
+        
     elif(COMMS_MODE == WIFI):
-        try:
-            logger.info("Initializing Wi-FI and MQTT")
-            from services.wifi_mqtt import mqtt_client
-            
-            logger.info("Publishing...")
-            mqtt_client.publish(topic=f"XBX/{os.getenv('DEVICE_ID')}/log/", msg="Testing...")
-            logger.info("Done publishing?")
-            
-        except Exception as e:
-            logger.info(f"Welp... we tried *shrugs*: {e}")
+        logger.warning(f"WiFi not currently supported")
+        return MODE_DEEPSLEEP
     else:
         logger.warning(f"Invalid comms mode: {COMMS_MODE}")
+        return MODE_DEEPSLEEP
     
-    # If no modem response, you might decide to skip transmit and sleep:
-    #    return MODE_DEEPSLEEP
-
     # Otherwise, hand off to modem library to finish the rest of the transmit logic
     # (not shown here). When transmit is fully done, fall through and go to DEEPSLEEP.
     end_time = time.monotonic()
@@ -245,6 +213,7 @@ def transmit_mode():
     logger.info(f"Memory Free: {gc.mem_free()}")
     gc.collect()
     logger.info(f"Memory Free: {gc.mem_free()}")
+    
     return MODE_DEEPSLEEP
 
 
@@ -278,6 +247,6 @@ def main():
 
         # small pause before next iteration to prevent tight-loop CPU spin
         time.sleep(0.1)
-
+        
 if __name__ == "__main__":
     main()

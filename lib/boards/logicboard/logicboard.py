@@ -10,43 +10,58 @@ from storage import VfsFat, mount
 import gc
 gc.enable()
 
+from reading import Reading
 from services.global_logger import logger, log_to_sd
+from services.device_manager import Device, I2CDevice, manager
 
-class CPU():
+class CPU(Device):
     def __init__(self):
         self.base_device = cpu
+        self.description = "cpu"
         
     @property
     def temperature(self):
-        return self.base_device.temperature
+        try:
+            return self.base_device.temperature
+        except Exception as e:
+            logger.warning(f"Failed to read {self.description}: {e}")
+            return None
+
+    def read(self):
+        readings = {}
+        
+        readings['cpu_temperature'] = self.temperature
+        
+        return readings
     
-class RTC():
-    def __init__(self, i2c_bus):
-        self.i2c_bus = i2c_bus
-        
-        locked = False
-        while(not(locked)):
-            locked = self.i2c_bus.try_lock()
-        i2c_devices = self.i2c_bus.scan()
-        self.i2c_bus.unlock()
-        
-        if(104 in i2c_devices):
-            address = 104
-        else:
-            raise RuntimeError("Battery Monitor not found on the I2C Bus")
-        
-        self.base_device = adafruit_ds3231.DS3231(i2c_bus)
-        
-        if(self.base_device.lost_power):
-            logger.info("RTC has lost power since the time was last set")
+class RTC(I2CDevice):
+    def __init__(self, i2c_bus, address=104):
+        super().__init__(i2c_bus, address, description="real time clock")
+
+    def initialize_driver(self):
+        base_device_driver = adafruit_ds3231.DS3231(self.i2c_bus)
+        return base_device_driver
     
     @property
     def datetime(self):
-        return self.base_device.datetime
-    
+        try:
+            return self.base_device.datetime
+        
+        except Exception as e:
+            logger.warning(f"Failed to read {self.description}: {e}")
+            self.update_device_status()
+            return None
+        
     @datetime.setter
     def datetime(self, new_time):
         self.base_device.datetime = new_time
+        
+    def read(self):
+        readings = {}
+        
+        readings['datetime'] = self.datetime
+        
+        return readings
     
 class LogicBoard():
     def __init__(self):
@@ -129,21 +144,19 @@ class LogicBoard():
             logger.info(f"Failed to initialize Cellular Modem: {e}")
             
         # Initialize RTC
-        logger.info("Initializing RTC")
-        try:
-            self.rtc = RTC(self.i2c_bus)
-            logger.info("Successfully initialized RTC")
-        except Exception as e:
-            logger.info(f"Failed to initialize RTC: {e}")
+        logger.info("Adding RTC to device manager")
+        manager.add_device('logicboard.rtc', RTC(self.i2c_bus))
         
         # Initialize Onboard RTC
         logger.info("Initializing Onboard RTC")
         try:
             self.OnboardRTC = rtc.RTC()
             logger.info("Successfully initialized Onboard RTC")
-            self.OnboardRTC.datetime = self.rtc.datetime
+            self.OnboardRTC.datetime = manager.devices['logicboard.rtc'].datetime
+            
             logger.info("Successfully synced Logicboard RTC and Onboard RTC")
         except Exception as e:
             logger.info(f"Failed to initialize Onboard RTC: {e}")
     
     gc.collect()
+    

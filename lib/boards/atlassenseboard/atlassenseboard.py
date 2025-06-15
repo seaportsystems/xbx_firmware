@@ -3,92 +3,124 @@ import atlas_ezo_ec
 import atlas_ezo_rtd
 import gc
 
+from reading import Reading
 from services.global_logger import logger
+from services.device_manager import I2CDevice, manager
 
-class EZOEC():
-    def __init__(self, i2c_bus):
-        self.i2c_bus = i2c_bus
-            
-        locked = False
-        while(not(locked)):
-            locked = self.i2c_bus.try_lock()
-            
-        i2c_devices = self.i2c_bus.scan()
-        self.i2c_bus.unlock()
-        
-        logger.info(f"Devices on bus: {i2c_devices}")
-        if(100 in i2c_devices):
-            address = 100
-        else:
-            raise RuntimeError("EZOEC not found on the I2C Bus")
-        
-        self.base_device = atlas_ezo_ec.EZO_EC(i2c_bus=self.i2c_bus, address=address)
+class EZOEC(I2CDevice):
+    def __init__(self, i2c_bus, address=100):
+        super().__init__(i2c_bus, address, description="conductivity")
+
+    def initialize_driver(self):
+        base_device_driver = atlas_ezo_ec.EZO_EC(i2c_bus=self.i2c_bus, address=self.address)
+        return base_device_driver
         
     @property
     def EC(self):
-        return self.base_device.EC
+        try:
+            return Reading(self.base_device.EC, "uS/cm", "salinity")
+        
+        except Exception as e:
+                logger.warning(f"Failed to read {self.description}: {e}")
+                self.update_device_status()
+                return None
     
     @property
     def TDS(self):
-        return self.base_device.TDS
+        try:
+            return Reading(self.base_device.TDS, "tds", "salinity")
+        
+        except Exception as e:
+                logger.warning(f"Failed to read {self.description}: {e}")
+                self.update_device_status()
+                return None
     
     @property
     def S(self):
-        return self.base_device.S
+        try:
+            return Reading(self.base_device.S, "S", "salinity")
+        
+        except Exception as e:
+                logger.warning(f"Failed to read {self.description}: {e}")
+                self.update_device_status()
+                return None
     
     @property
     def SG(self):
-        return self.base_device.SG
+        try:
+            return Reading(self.base_device.SG, "SG", "salinity")
         
-class EZODO():
-    def __init__(self, i2c_bus):
-        self.i2c_bus = i2c_bus
-            
-        locked = False
-        while(not(locked)):
-            locked = self.i2c_bus.try_lock()
-            
-        i2c_devices = self.i2c_bus.scan()
-        self.i2c_bus.unlock()
+        except Exception as e:
+                logger.warning(f"Failed to read {self.description}: {e}")
+                self.update_device_status()
+                return None
+    
+    def read(self):
+        readings = {}
         
-        logger.info(f"Devices on bus: {i2c_devices}")
-        if(97 in i2c_devices):
-            address = 97
-        else:
-            raise RuntimeError("EZODO not found on the I2C Bus")
+        readings['EC'] = self.EC
         
-        self.base_device = atlas_ezo_do.EZO_DO(i2c_bus=self.i2c_bus, address=address)
+        return readings
+        
+class EZODO(I2CDevice):
+    def __init__(self, i2c_bus, address=97):
+        super().__init__(i2c_bus, address, description="dissolved oxygen")
+
+    def initialize_driver(self):
+        base_device_driver = atlas_ezo_do.EZO_DO(i2c_bus=self.i2c_bus, address=self.address)
+        return base_device_driver
         
     @property
     def MGL(self):
-        return self.base_device.MGL
+        try:
+            return Reading(self.base_device.MGL, "mg/l", "dissolve oxgen")
+        
+        except Exception as e:
+                logger.warning(f"Failed to read {self.description}: {e}")
+                self.update_device_status()
+                return None
     
     @property
     def SAT(self):
-        return self.base_device.SAT
+        try:
+            return Reading(self.base_device.SAT, "%", "dissolved oxygen")
+        
+        except Exception as e:
+                logger.warning(f"Failed to read {self.description}: {e}")
+                self.update_device_status()
+                return None
+    
+    def read(self):
+        readings = {}
+        
+        readings['MGL'] = self.MGL
+        
+        return readings
 
-class EZORTD():
-    def __init__(self, i2c_bus):
-        self.i2c_bus = i2c_bus
-            
-        locked = False
-        while(not(locked)):
-            locked = self.i2c_bus.try_lock()
-            
-        i2c_devices = self.i2c_bus.scan()
-        self.i2c_bus.unlock()
-        
-        logger.info(f"Devices on bus: {i2c_devices}")
-        if(102 in i2c_devices):
-            address = 102
-        else:
-            raise RuntimeError("EZODO not found on the I2C Bus")
-        
-        self.base_device = atlas_ezo_rtd.EZO_RTD(i2c_bus=self.i2c_bus, address=address)
+class EZORTD(I2CDevice):
+    def __init__(self, i2c_bus, address=102):
+        super().__init__(i2c_bus, address, description="water temperature")
+
+    def initialize_driver(self):
+        base_device_driver = atlas_ezo_rtd.EZO_RTD(i2c_bus=self.i2c_bus, address=self.address)
+        return base_device_driver
         
     @property
     def T(self):
-        return self.base_device.T
+        try:
+            return Reading(self.base_device.T, "C", "water temperature")
+        
+        except Exception as e:
+                logger.warning(f"Failed to read {self.description}: {e}")
+                self.update_device_status()
+                return None
+    
+    def read(self):
+        readings = {}
+        
+        readings['T'] = self.T
+        
+        return readings
         
 class AtlasSenseBoard():
     def __init__(self, parent):
@@ -97,26 +129,14 @@ class AtlasSenseBoard():
         self.parent = parent
         self.i2c_bus = parent.i2c_bus
         
-        logger.info("Initializing EZOEC")
-        try:
-            self.EZO_EC = EZOEC(self.i2c_bus)
-            logger.info("Successfully initialized EZOEC")
-        except Exception as e:
-            logger.warning(f"Failed to initialize EZOEC: {e}")
+        logger.info("Adding conductivity sensor to device manager")
+        manager.add_device("atlassenseboard.conductivity", EZOEC(self.i2c_bus))
         
-        logger.info("Initializing EZODO")
-        try:
-            self.EZO_DO = EZODO(self.i2c_bus)
-            logger.info("Successfully initialized EZODO")
-        except Exception as e:
-            logger.warning(f"Failed to initialize EZODO: {e}")
+        logger.info("Adding dissolved oxygen sensor to device manager")
+        manager.add_device("atlassenseboard.dissolvedoxygen", EZODO(self.i2c_bus))
         
-        logger.info("Initializing EZORTD")
-        try:
-            self.EZO_RTD = EZORTD(self.i2c_bus)
-            logger.info("Successfully initialized EZORTD")
-        except Exception as e:
-            logger.warning(f"Failed to initialize EZORTD: {e}")
+        logger.info("Adding watertemperature sensor to device manager")
+        manager.add_device("atlassenseboard.watertemperature", EZORTD(self.i2c_bus))
             
         logger.info("Successfully initialized AtlasSenseBoard")
         gc.collect()

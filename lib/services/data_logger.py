@@ -35,27 +35,33 @@ class DataLogger:
                         - reading.value      (numeric or str)
                         - reading.unit       (string)
         """
-        filename = f"{reading.description}"
-        filename = filename.lower()
-        filename = filename.strip()
-        filename = sub(r'[^a-z0-9]', '', filename)
-        filename = f"{filename}.csv"
-        filepath = f"/sd/hrd/{filename}"
         
-        if filename not in os.listdir("/sd/hrd/"):
-            logger.info(f"Data file {filename} doesn't exist...")
-            logger.info(f"Creating Data file: {filename}...")
-            with open(filepath, "w"):
-                logger.info(f"Data file created: {filename}...")
-                pass
-
-        line = f"{reading.datetime},{reading.value},{reading.unit}\n"
         try:
-            with open(filepath, "a") as f:
-                f.write(line)
-                f.flush()
-        except OSError:
-            # If write fails (e.g., no SD card), silently ignore or handle as needed
-            pass
+            if(reading is not None):
+                logger.info(reading)
+                filename = f"{reading.description}"
+                filename = filename.lower()
+                filename = filename.strip()
+                filename = sub(r'[^a-z0-9]', '', filename)
+                filename = f"{filename}.csv"
+                filepath = f"/sd/hrd/{filename}"
+                
+                if filename not in os.listdir("/sd/hrd/"):
+                    logger.info(f"Data file {filename} doesn't exist...")
+                    logger.info(f"Creating Data file: {filename}...")
+                    with open(filepath, "w"):
+                        logger.info(f"Data file created: {filename}...")
+                        pass
+
+                line = f"{reading.datetime},{reading.value},{reading.unit}\n"
+                try:
+                    with open(filepath, "a") as f:
+                        f.write(line)
+                        f.flush()
+                except OSError:
+                    # If write fails (e.g., no SD card), silently ignore or handle as needed
+                    pass
+        except Exception as e:
+            logger.warning(f"Failed to log reading: {e}")
     
     collect()

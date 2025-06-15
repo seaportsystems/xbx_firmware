@@ -1,9 +1,12 @@
+from microcontroller import watchdog
 import board
 import digitalio
 import gc
 import os
 import re
 import time
+
+from services.global_logger import logger
 
 gc.enable()
 
@@ -131,223 +134,264 @@ class MQTT_Socket:
         
     #open socket, connect, do your thing, disconnect, close
     def open(self):
-        if(not self.modem.is_comms_ready()):
-            raise ConnectionError("Modem not connected...")
-        
-        print(f'Open Command: AT+QMTOPEN={self.socket_id},"{self.hostname}",{self.port}')
-        response = self.modem.send_comm_get_response(f'AT+QMTOPEN={self.socket_id},"{self.hostname}",{self.port}', timeout=60)
+        logger.info("Openning socket")
+        try:
+            if(not self.modem.is_comms_ready()):
+                raise ConnectionError("Modem not connected...")
+            
+            print(f'Open Command: AT+QMTOPEN={self.socket_id},"{self.hostname}",{self.port}')
+            response = self.modem.send_comm_get_response(f'AT+QMTOPEN={self.socket_id},"{self.hostname}",{self.port}', timeout=60)
 
-        #Check that the open connection command was RECEIVED AND PARSED successfully
-        if(response['status_code'] == Status.OK):
-            print("Waiting for socket to open...")
-            pattern = re.compile(r"^\+QMTOPEN: (.*)$")
+            #Check that the open connection command was RECEIVED AND PARSED successfully
+            if(response['status_code'] == Status.OK):
+                print("Waiting for socket to open...")
+                pattern = re.compile(r"^\+QMTOPEN: (.*)$")
 
-            #Wait for a +QMTOPEN: message
-            open_result_response = self.modem.wait_for_response(pattern, timeout=60)
-            print(f"Open Result Response: {open_result_response}")
-
-        else:
-            print(response)
+                #Wait for a +QMTOPEN: message
+                open_result_response = self.modem.wait_for_response(pattern, timeout=60)
+                logger.info(f"Open Result Response: {open_result_response}")           
+                logger.info("Successfully opened socket")
+                
+            else:
+                print(response)
+        except Exception as e:
+            logger.warning(f"Failed to open the socket: {e}")
             
     def close(self):
-        #Check for open connections
-        if(self.is_connected()):
-            self.disconnect()
-               
-        #Try to open the connection
-        response = self.modem.send_comm_get_response(f'AT+QMTCLOSE={self.socket_id}')
-
-        #Check that the open connection command was RECEIVED AND PARSED successfully
-        if(response['status_code'] == Status.OK):
-            print("Waiting for connection to close...")
-            pattern = re.compile(r"^\+QMTCLOSE: (.*)$")
-
-            #Wait for a +QMTOPEN: message to check result of attempting to open connection
-            disconnect_result_response = self.modem.wait_for_response(pattern, timeout=30)
-
-            if(disconnect_result_response['status_code'] == Status.OK):
-                parsed_responses = self.modem.parse_response_data([disconnect_result_response['response_line']], pattern)
-                parsed_response = parsed_responses[0]
+        logger.info("Closing socket")
+        try:   
+            #Check for open connections
+            if(self.is_connected()):
+                self.disconnect()
                 
-                if(int(parsed_response[1]) == 0):
-                    print(f"Successfully closed socket: {parsed_response[0]}: {parsed_response[1]}")
-                    return True
+            #Try to open the connection
+            response = self.modem.send_comm_get_response(f'AT+QMTCLOSE={self.socket_id}')
+
+            #Check that the open connection command was RECEIVED AND PARSED successfully
+            if(response['status_code'] == Status.OK):
+                print("Waiting for connection to close...")
+                pattern = re.compile(r"^\+QMTCLOSE: (.*)$")
+
+                #Wait for a +QMTOPEN: message to check result of attempting to open connection
+                disconnect_result_response = self.modem.wait_for_response(pattern, timeout=30)
+
+                if(disconnect_result_response['status_code'] == Status.OK):
+                    parsed_responses = self.modem.parse_response_data([disconnect_result_response['response_line']], pattern)
+                    parsed_response = parsed_responses[0]
+                    
+                    if(int(parsed_response[1]) == 0):
+                        logger.info(f"Successfully closed socket: {parsed_response[0]}: {parsed_response[1]}")
+                        return True
+                    else:
+                        logger.warning(f"Failed to close socket: {parsed_response[0]}: {parsed_response[1]}")
+                        return False
                 else:
-                    print(f"Failed to close socket: {parsed_response[0]}: {parsed_response[1]}")
+                    logger.warning(f"Failed to close socket, something weird...")
+                    logger.warning(f"{disconnect_result_response}")
                     return False
-            else:
-                print(f"Failed to close socket, something weird...")
-                return False
+                
+        except Exception as e:
+            logger.warning(f"Failed to close the socket: {e}")
     
     def connect(self, retries=3):
-        if(not self.is_open()):
-            raise RuntimeError("Socket isn't open, can't attempt to connect")
-        
-        while retries > 0:
-            print(f"Connecting to MQTT Broker. Retries remaining: {retries}")
-            #Try to connect to broker
-            print(f'AT+QMTCONN={self.socket_id},"{self.client_id}"')
-            response = self.modem.send_comm_get_response(f'AT+QMTCONN={self.socket_id},"{self.client_id}"', timeout=30)
+        try:
+            if(not self.is_open()):
+                raise RuntimeError("Socket isn't open, can't attempt to connect")
             
-            #Check that the connect command was RECEIVED AND PARSED successfully
-            if(response['status_code'] == Status.OK):
-                print("Waiting to establish connection to broker...")
-                pattern = re.compile(r"^\+QMTCONN: (.*)$")
+            while retries > 0:
+                logger.info(f"Connecting to MQTT Broker. Retries remaining: {retries}")
+                #Try to connect to broker
+                logger.info(f'Connecting with command: AT+QMTCONN={self.socket_id},"{self.client_id}"')
+                response = self.modem.send_comm_get_response(f'AT+QMTCONN={self.socket_id},"{self.client_id}"', timeout=30)
+                
+                #Check that the connect command was RECEIVED AND PARSED successfully
+                if(response['status_code'] == Status.OK):
+                    print("Waiting to establish connection to broker...")
+                    pattern = re.compile(r"^\+QMTCONN: (.*)$")
+                    qmtstat_pattern = re.compile(r"^\+QMTSTAT: (.*)$")
+                    
+                    #Wait for a +QMTCONN: message to check result of attempting to connect to broker
+                    connect_result_response = self.modem.wait_for_response(pattern, secondary_pattern = qmtstat_pattern, timeout=120)
+                    
+                    print(f"Connect Result Response: {connect_result_response}")
 
-                #Wait for a +QMTCONN: message to check result of attempting to connect to broker
-                connect_result_response = self.modem.wait_for_response(pattern, timeout=120)
-                print(f"Connect Result Response: {connect_result_response}")
+                    if(connect_result_response['status_code'] == Status.OK):
+                        print(f"Status OK")
+                        print(f"Data: {response['data']}")
+                        parsed_responses = self.modem.parse_response_data([connect_result_response['response_line']], pattern)
+                        print(f"Parsed Response: {parsed_responses}")
+                        parsed_response = parsed_responses[0]
+                        print("Connected!")
 
-                if(connect_result_response['status_code'] == Status.OK):
-                    print(f"Status OK")
-                    print(f"Data: {response['data']}")
-                    parsed_responses = self.modem.parse_response_data([connect_result_response['response_line']], pattern)
-                    print(f"Parsed Response: {parsed_responses}")
-                    parsed_response = parsed_responses[0]
-                    print("Connected!")
-
-                    return {'socket_id': parsed_response[0], 'result': parsed_response[1]}
-            else:
-                print(f"Error connecting: {response}")
-                print("Retrying in 5 seconds...")
-                time.sleep(5)
-                retries = retries - 1
+                        return {'socket_id': parsed_response[0], 'result': parsed_response[1]}
+                else:
+                    print(f"Error connecting: {response}")
+                    print("Retrying in 3 seconds...")
+                    #logger.info(f"Feeding watchdog")
+                    watchdog.feed()
+                    time.sleep(3)
+                    retries = retries - 1
+                    
+        except Exception as e:
+            logger.warning(f"Failed to connect to MQTT Broker: {e}")
     
     def disconnect(self):
-        #Try to connect to broker
-        response = self.modem.send_comm_get_response(f'AT+QMTDISC={self.socket_id}')
+        try:
+            #Try to connect to broker
+            response = self.modem.send_comm_get_response(f'AT+QMTDISC={self.socket_id}')
 
-        #Check that the connect command was RECEIVED AND PARSED successfully
-        if(response['status_code'] == Status.OK):
-            print("Waiting to confirm disconnection with broker...")
-            pattern = re.compile(r"^\+QMTDISC: (.*)$")
+            #Check that the connect command was RECEIVED AND PARSED successfully
+            if(response['status_code'] == Status.OK):
+                print("Waiting to confirm disconnection with broker...")
+                pattern = re.compile(r"^\+QMTDISC: (.*)$")
 
-            #Wait for a +QMTCONN: message to check result of attempting to connect to broker
-            connect_result_response = self.modem.wait_for_response(pattern, timeout=10)
+                #Wait for a +QMTCONN: message to check result of attempting to connect to broker
+                connect_result_response = self.modem.wait_for_response(pattern, timeout=10)
 
-            if(connect_result_response['status_code'] == Status.OK):
-                print("Successfully sent disconnect command")
-                # parsed_responses = self.modem.parse_response_data(response['data'], pattern)
-                # parsed_response = parsed_responses[0]
-                
-                disconnected_pattern = re.compile(r"^\+QMTSTAT: (.*)$")
-                print("Waiting for QMSTAT: +0,5")
-                disconnected_response = self.modem.wait_for_response(disconnected_pattern, timeout=30)
-                print(f"disconnect_response: {disconnected_response}")
-                parsed_disconnected_response = self.modem.parse_response_data([disconnected_response['response_line']], disconnected_pattern)[0]
-                print(f"parsed_disconnected_response: {parsed_disconnected_response}")
-                
-                if(int(parsed_disconnected_response[1]) == 5):
-                    print(f"Disconnected \t {disconnected_response}")
+                if(connect_result_response['status_code'] == Status.OK):
+                    print("Successfully sent disconnect command")
+                    # parsed_responses = self.modem.parse_response_data(response['data'], pattern)
+                    # parsed_response = parsed_responses[0]
+                    
+                    disconnected_pattern = re.compile(r"^\+QMTSTAT: (.*)$")
+                    print("Waiting for QMSTAT: +0,5")
+                    disconnected_response = self.modem.wait_for_response(disconnected_pattern, timeout=30)
+                    print(f"disconnect_response: {disconnected_response}")
+                    parsed_disconnected_response = self.modem.parse_response_data([disconnected_response['response_line']], disconnected_pattern)[0]
+                    print(f"parsed_disconnected_response: {parsed_disconnected_response}")
+                    
+                    if(int(parsed_disconnected_response[1]) == 5):
+                        print(f"Disconnected \t {disconnected_response}")
+                    else:
+                        print(f"Have to force close...")
+                        self.close()
                 else:
-                    print(f"Have to force close...")
-                    self.close()
-            else:
-                #Failed to set
-                pass
+                    #Failed to set
+                    pass
+                
+        except Exception as e:
+            logger.warning(f"Failed to disconnect from MQTT Broker: {e}")
         
     def subscribe(self, topic, qos):
-        if(not self.is_connected()):
-            raise RuntimeError("MQTT isn't connected")
-        
-        msg_id = randint(0,65535)
-        
-        response = self.modem.send_comm_get_response(f'AT+QMTSUB={self.socket_id},{msg_id},"{topic}",{qos}')
+        try:
+            if(not self.is_connected()):
+                raise RuntimeError("MQTT isn't connected")
+            
+            msg_id = randint(0,65535)
+            
+            response = self.modem.send_comm_get_response(f'AT+QMTSUB={self.socket_id},{msg_id},"{topic}",{qos}')
 
-        #Check that the subscribe command was RECEIVED AND PARSED successfully
-        if(response['status_code'] == Status.OK):
-            print("Waiting to confirm subscription with broker...")
-            pattern = re.compile(r"^\+QMTSUB: (.*)$")
+            #Check that the subscribe command was RECEIVED AND PARSED successfully
+            if(response['status_code'] == Status.OK):
+                print("Waiting to confirm subscription with broker...")
+                pattern = re.compile(r"^\+QMTSUB: (.*)$")
 
-            #Wait for a +QMTCONN: message to check result of attempting to connect to broker
-            subscribe_result_response = self.modem.wait_for_response(pattern, timeout=10)
+                #Wait for a +QMTCONN: message to check result of attempting to connect to broker
+                subscribe_result_response = self.modem.wait_for_response(pattern, timeout=10)
 
-            if(subscribe_result_response['status_code'] == Status.OK):
-                parsed_responses = self.modem.parse_response_data(response['data'], pattern)
-                print(parsed_responses)
-                parsed_response = parsed_responses[0]
+                if(subscribe_result_response['status_code'] == Status.OK):
+                    parsed_responses = self.modem.parse_response_data(response['data'], pattern)
+                    print(parsed_responses)
+                    parsed_response = parsed_responses[0]
 
-                if(parsed_response[2] == 0):
-                    return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2], 'granted_qos_level': parsed_response[3]}
-                if(parsed_response[2] == 1):
-                    return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2], 'packet_retries': parsed_response[3]}
-                if(parsed_response[2] == 2):
-                    return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2]}
-            else:
-                #Failed to set
-                pass
+                    if(parsed_response[2] == 0):
+                        return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2], 'granted_qos_level': parsed_response[3]}
+                    if(parsed_response[2] == 1):
+                        return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2], 'packet_retries': parsed_response[3]}
+                    if(parsed_response[2] == 2):
+                        return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2]}
+                else:
+                    #Failed to set
+                    pass
+        except Exception as e:
+            logger.warning(f"Failed to subscribe to topic {topic}: {e}")
 
     def unsubscribe(self, topic):
-        if(not self.is_connected()):
-            raise RuntimeError("MQTT isn't connected")
-        
-        msg_id = randint(0,65535)
-        
-        response = self.modem.send_comm_get_response(f'AT+QMTUNS={self.socket_id},{msg_id},"{topic}"')
+        try:
+            if(not self.is_connected()):
+                raise RuntimeError("MQTT isn't connected")
+            
+            msg_id = randint(0,65535)
+            
+            response = self.modem.send_comm_get_response(f'AT+QMTUNS={self.socket_id},{msg_id},"{topic}"')
 
-        #Check that the subscribe command was RECEIVED AND PARSED successfully
-        if(response['status_code'] == Status.OK):
-            print("Waiting to confirm unsubscription with broker...")
-            pattern = re.compile(r"^\+QMTUNS: (.*)$")
+            #Check that the subscribe command was RECEIVED AND PARSED successfully
+            if(response['status_code'] == Status.OK):
+                print("Waiting to confirm unsubscription with broker...")
+                pattern = re.compile(r"^\+QMTUNS: (.*)$")
 
-            #Wait for a +QMTCONN: message to check result of attempting to connect to broker
-            unsubscribe_result_response = self.modem.wait_for_response(pattern, timeout=10)
+                #Wait for a +QMTCONN: message to check result of attempting to connect to broker
+                unsubscribe_result_response = self.modem.wait_for_response(pattern, timeout=10)
 
-            if(unsubscribe_result_response['status_code'] == Status.OK):
-                parsed_responses = self.modem.parse_response_data(response['data'], pattern)
-                parsed_response = parsed_responses[0]
-                
-                if(parsed_response[2] == 0):
-                    return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2]}
-                
+                if(unsubscribe_result_response['status_code'] == Status.OK):
+                    parsed_responses = self.modem.parse_response_data(response['data'], pattern)
+                    parsed_response = parsed_responses[0]
+                    
+                    if(parsed_response[2] == 0):
+                        return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2]}
+                    
+        except Exception as e:
+            logger.warning(f"Failed to unsubscribe from topic {topic}: {e}")
+            
     def publish(self, topic, msg, qos=1, retain=0):
-        if(not self.is_connected()):
-            raise RuntimeError("MQTT isn't connected")
-        
-        msg_id = randint(0,65535)
-        
-        response = self.modem.send_comm_get_response(f'AT+QMTPUBEX={self.socket_id},{msg_id},{qos},{retain},"{topic}","{msg}"')
+        try:
+            if(not self.is_connected()):
+                raise RuntimeError("MQTT isn't connected")
+            
+            msg_id = randint(0,65535)
+            logger.info(f"Publishing message: {msg} to topic: {topic} with a QoS of {qos}")
+            response = self.modem.send_comm_get_response(f'AT+QMTPUBEX={self.socket_id},{msg_id},{qos},{retain},"{topic}","{msg}"')
 
-        #Check that the subscribe command was RECEIVED AND PARSED successfully
-        if(response['status_code'] == Status.OK):
-            print("Waiting to confirm publish with broker...")
-            pattern = re.compile(r"^\+QMTPUB: (.*)$")
+            #Check that the subscribe command was RECEIVED AND PARSED successfully
+            if(response['status_code'] == Status.OK):
+                logger.info(f"Successfully sent publish command")
+                
+                logger.info("Waiting to confirm publish with broker...")
+                pattern = re.compile(r"^\+QMTPUB: (.*)$")
 
-            #Wait for a +QMTCONN: message to check result of attempting to connect to broker
-            publish_result_response = self.modem.wait_for_response(pattern, timeout=10)
+                #Wait for a +QMTCONN: message to check result of attempting to connect to broker
+                publish_result_response = self.modem.wait_for_response(pattern, timeout=10)
 
-            if(publish_result_response['status_code'] == Status.OK):
-                parsed_responses = self.modem.parse_response_data([publish_result_response['response_line']], pattern)
-                parsed_response = parsed_responses[0]
+                if(publish_result_response['status_code'] == Status.OK):
+                    parsed_responses = self.modem.parse_response_data([publish_result_response['response_line']], pattern)
+                    parsed_response = parsed_responses[0]
 
-                if(parsed_response[2] == 1):
-                    return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2], 'packet_retries': parsed_response[3]}
+                    if(parsed_response[2] == 1):
+                        return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2], 'packet_retries': parsed_response[3]}
+                    else:
+                        return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2]}
                 else:
-                    return {'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'result': parsed_response[2]}
+                    #Failed to set
+                    pass
             else:
-                #Failed to set
-                pass
+                logger.warning(f"Failed to send publish command")
+                
+        except Exception as e:
+            logger.warning(f"Failed to publish to topic: {e}")
 
     def read(self):
-        if(not self.is_connected()):
-            raise RuntimeError("MQTT isn't connected")
-        
-        response = self.modem.send_comm_get_response(f'AT+QMTRECV={self.socket_id}')
+        try:
+            if(not self.is_connected()):
+                raise RuntimeError("MQTT isn't connected")
+            
+            response = self.modem.send_comm_get_response(f'AT+QMTRECV={self.socket_id}')
 
-        #Check that the subscribe command was RECEIVED AND PARSED successfully
-        if(response['status_code'] == Status.OK):
-            print("Waiting for read...")
-            pattern = re.compile(r"^\+QMTRECV: (.*)$")
+            #Check that the subscribe command was RECEIVED AND PARSED successfully
+            if(response['status_code'] == Status.OK):
+                print("Waiting for read...")
+                pattern = re.compile(r"^\+QMTRECV: (.*)$")
 
-            #Wait for a +QMTCONN: message to check result of attempting to connect to broker
-            recv_result_response = self.modem.wait_for_response(pattern, imeout=10)
+                #Wait for a +QMTCONN: message to check result of attempting to connect to broker
+                recv_result_response = self.modem.wait_for_response(pattern, imeout=10)
 
-            if(recv_result_response['status_code'] == Status.OK):
-                parsed_responses = self.modem.parse_response_data(response['data'], pattern)
-                print(parsed_responses)
-                messages = [{'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'topic': parsed_response[2], 'payload_len': parsed_response[3], 'payload': parsed_response[4]} for parsed_response in parsed_responses]
+                if(recv_result_response['status_code'] == Status.OK):
+                    parsed_responses = self.modem.parse_response_data(response['data'], pattern)
+                    print(parsed_responses)
+                    messages = [{'socket_id': parsed_response[0], 'msgID': parsed_response[1], 'topic': parsed_response[2], 'payload_len': parsed_response[3], 'payload': parsed_response[4]} for parsed_response in parsed_responses]
 
-                return messages
+                    return messages
+        except Exception as e:
+            logger.warning(f"Failed to read message from topic: {e}")
     
     def get_mqtt_socket_state(self):
         response = self.modem.send_comm_get_response(f'AT+QMTOPEN?')
@@ -555,6 +599,8 @@ class BG95M3:
         
         #Waits for OK, ERROR or +CME ERROR: message, or returns timeout error
         while True:
+            #logger.info(f"Feeding watchdog")
+            watchdog.feed()
             time.sleep(0.1)  # wait for new chars
 
             if time.time() - timer < timeout:
@@ -585,7 +631,7 @@ class BG95M3:
                     print("Matched: CMS ERROR")
                     return {"status": line, "status_code":Status.ERROR, "data": response_lines[:index], "response_line": line}
 
-    def wait_for_response(self, response_pattern, timeout=5):
+    def wait_for_response(self, response_pattern, secondary_pattern=None, timeout=5):
         """
         Waits up to timeout duration, for a line from the uart_bus, matching regex response pattern
         """
@@ -596,6 +642,8 @@ class BG95M3:
         
         #Waits for OK, ERROR or +CME ERROR: message, or returns timeout error
         while True:
+            #logger.info(f"Feeding watchdog")
+            watchdog.feed()
             time.sleep(0.1)  # wait for new chars
 
             if time.time() - timer < timeout:
@@ -614,12 +662,16 @@ class BG95M3:
                 response_lines.extend([x for x in response.split("\r\n") if x != ""])
                 response = ""
 
+            logger.info(f"In waiting for a respone, we have {len(response_lines)}")
+            
             for index, line in enumerate(response_lines):
                 if response_pattern.match(line):
-                    print(f"Matched: {response_pattern}")
+                    logger.info(f"Matched primary response pattern")
                     return {"status": "OK", "status_code": Status.OK, "data": response_lines[:index], "response_line": line}
-                else:
-                    print(f"Got line, but didn't match: {line}")
+                elif secondary_pattern is not None:
+                    if secondary_pattern.match(line):
+                        logger.info(f"Matched secondary response pattern")
+                        return {"status": "Unknown", "status_code": Status.UNKNOWN, "data": response_lines[:index], "response_line": line}
 
     def parse_response_data(self, data, response_pattern):
         """
@@ -891,6 +943,10 @@ class BG95M3:
         self.send_comm(f'AT+QFUPL="{filename}",{len(file)},{timeout}')
         #Wait for modem to respond with CONNECT
         print("Waiting for CONNECT")
+        
+        #logger.info(f"Feeding watchdog")
+        watchdog.feed()
+        
         ready = self.wait_for_response(re.compile(r"^CONNECT$"))
         time.sleep(.1)
         #Send file contents
