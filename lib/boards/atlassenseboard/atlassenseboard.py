@@ -13,7 +13,16 @@ class EZOEC(I2CDevice):
 
     def initialize_driver(self):
         base_device_driver = atlas_ezo_ec.EZO_EC(i2c_bus=self.i2c_bus, address=self.address)
+        base_device_driver.status()
         return base_device_driver
+        
+    def deinitialize_device(self):
+        try:
+            self.base_device.sleep()
+            return True
+        except Exception as e:
+            logger.info(f"Failed to put device to sleep: {e}")
+            return False
         
     @property
     def EC(self):
@@ -56,11 +65,15 @@ class EZOEC(I2CDevice):
                 return None
     
     def read(self):
-        readings = {}
-        
-        readings['EC'] = self.EC
-        
-        return readings
+        if self.enabled:
+            readings = {}
+            
+            readings['EC'] = self.EC
+            
+            return readings
+        else:
+            logger.warning(f"Device is disabled")
+            return {}
         
 class EZODO(I2CDevice):
     def __init__(self, i2c_bus, address=97):
@@ -68,7 +81,16 @@ class EZODO(I2CDevice):
 
     def initialize_driver(self):
         base_device_driver = atlas_ezo_do.EZO_DO(i2c_bus=self.i2c_bus, address=self.address)
+        base_device_driver.status()
         return base_device_driver
+        
+    def deinitialize_device(self):
+        try:
+            self.base_device.sleep()
+            return True
+        except Exception as e:
+            logger.info(f"Failed to put device to sleep: {e}")
+            return False
         
     @property
     def MGL(self):
@@ -91,11 +113,15 @@ class EZODO(I2CDevice):
                 return None
     
     def read(self):
-        readings = {}
-        
-        readings['MGL'] = self.MGL
-        
-        return readings
+        if self.enabled:
+            readings = {}
+            
+            readings['MGL'] = self.MGL
+            
+            return readings
+        else:
+            logger.warning(f"Device is disabled")
+            return {}
 
 class EZORTD(I2CDevice):
     def __init__(self, i2c_bus, address=102):
@@ -103,7 +129,16 @@ class EZORTD(I2CDevice):
 
     def initialize_driver(self):
         base_device_driver = atlas_ezo_rtd.EZO_RTD(i2c_bus=self.i2c_bus, address=self.address)
+        base_device_driver.status()
         return base_device_driver
+        
+    def deinitialize_device(self):
+        try:
+            self.base_device.sleep()
+            return True
+        except Exception as e:
+            logger.info(f"Failed to put device to sleep: {e}")
+            return False
         
     @property
     def T(self):
@@ -116,11 +151,15 @@ class EZORTD(I2CDevice):
                 return None
     
     def read(self):
-        readings = {}
-        
-        readings['T'] = self.T
-        
-        return readings
+        if self.enabled:
+            readings = {}
+            
+            readings['T'] = self.T
+            
+            return readings
+        else:
+            logger.warning(f"Device is disabled")
+            return {}
         
 class AtlasSenseBoard():
     def __init__(self, parent):

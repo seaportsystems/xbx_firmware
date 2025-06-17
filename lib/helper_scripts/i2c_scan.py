@@ -31,3 +31,9 @@ while True:
         
     print("")
     time.sleep(1)
+    
+from services.device_manager import manager
+manager.devices['attitudeboard.barometer'].base_device.enabled = True
+manager.devices['attitudeboard.imu']
+
+while True: print(manager.devices['attitudeboard.imu'].read()['accelerations'].value)

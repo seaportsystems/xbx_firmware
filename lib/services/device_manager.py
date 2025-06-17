@@ -69,7 +69,27 @@ class I2CDevice():
             self.enabled = False
     
     def disable(self):
-        raise NotImplementedError("Subclasses must implement .disable()")
+        logger.info(f"Disabling {self.description}")
+        try:
+            if(self.detected):
+                deinitialized = self.deinitialize_device()
+                    
+                if deinitialized:
+                    logger.info(f"Successfully deinitialized {self.description}")
+                    self.base_device = None
+                    self.enabled = False
+                else:
+                    logger.warning(f"Failed to disable {self.description}")
+                    
+            else:
+                logger.warning(f"Failed to disable {self.description}: device not found on the bus")
+                self.base_device = None
+                self.enabled = False
+            
+        except Exception as e:
+            logger.warning(f"Failed to enable {self.description}: {e}")
+            self.base_device = None
+            self.enabled = False
 
 class UARTDevice():
     def __init__(self):

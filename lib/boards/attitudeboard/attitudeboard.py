@@ -68,6 +68,22 @@ class IMU(I2CDevice):
         base_device_driver = adafruit_lsm9ds1.LSM9DS1_I2C(self.i2c_bus, mag_address=self.mag_address, xg_address=self.xg_address)
         return base_device_driver
         
+    def deinitialize_device(self):
+        try:
+            # Disable gyroscope (ODR_G = 000 → power-down)
+            self.base_device._write_u8(False, 0x10, 0x00)
+
+            # Disable accelerometer (ODR_XL = 000 → power-down)
+            self.base_device._write_u8(False, 0x20, 0x00)
+
+            # Disable magnetometer (MD[1:0] = 11 → power-down mode)
+            self.base_device._write_u8(True, 0x22, 0x03)
+            
+            return True
+        
+        except Exception as e:
+            return False
+    
     @property
     def accelerations(self):
         try:
@@ -109,13 +125,17 @@ class IMU(I2CDevice):
             return None
     
     def read(self):
-        readings = {}
+        if self.enabled:
+            readings = {}
+            
+            readings['accelerations'] = self.accelerations
+            readings['rotations'] = self.rotations
+            readings['magnetics'] = self.magnetics
         
-        readings['accelerations'] = self.accelerations
-        readings['rotations'] = self.rotations
-        readings['magnetics'] = self.magnetics
-        
-        return readings
+            return readings
+        else:
+            logger.warning(f"Device is disabled")
+            return {}
     
 class Barometer(I2CDevice):
     def __init__(self, i2c_bus, address=92):
@@ -125,6 +145,19 @@ class Barometer(I2CDevice):
         base_device_driver = adafruit_lps2x.LPS25(self.i2c_bus, address=self.address)
         return base_device_driver
     
+    def deinitialize_device(self):
+        try:
+            self.base_device.enabled = False
+            if(self.base_device.enabled == False):
+                return True
+            else:
+                logger.info(f"Failed to put device to sleep: {e}")
+                return False
+            
+        except Exception as e:
+            logger.info(f"Failed to put device to sleep: {e}")
+            return False
+        
     @property
     def pressure(self):
         try:
@@ -146,12 +179,16 @@ class Barometer(I2CDevice):
             return None
     
     def read(self):
-        readings = {}
-        
-        readings['temperature'] = self.temperature
-        readings['pressure'] = self.pressure
-        
-        return readings
+        if self.enabled:
+            readings = {}
+            
+            readings['temperature'] = self.temperature
+            readings['pressure'] = self.pressure
+            
+            return readings
+        else:
+                logger.warning(f"Device is disabled")
+                return {}
         
 class AttitudeBoard():
     def __init__(self, parent):

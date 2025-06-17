@@ -25,8 +25,9 @@ gc.enable()
 DISABLE                  = 0
 CELLULAR                 = 1
 WIFI                     = 2
+DEBUG                    = 3
 
-COMMS_MODE               = CELLULAR
+COMMS_MODE               = DEBUG
 
 # ---------------------------------------------------------------------
 # TIMING CONFIGURATION
@@ -134,16 +135,18 @@ def transmit_mode():
         Power on modem and wait up to MODEM_RESPONSE_TIMEOUT seconds
         or an “OK” response to confirm UART connectivity.
     """
+    logger.info("Entering Transmit Mode")
     logger.info(f"Memory Free: {gc.mem_free()}")
     gc.collect()
     logger.info(f"Memory Free: {gc.mem_free()}")
-    # ›› power on modem (placeholder)
-    #    modem_power_enable(True)
-    logger.info("Entering Transmit Mode")
-    time.sleep(1)  # allow boot time
 
     #unsent_samples_file = open("/sd/sample_data/uss.sample", "r")
-    tmp_sample_file = open("/sd/sample_data/tmp.sample", "r")
+    try:
+        tmp_sample_file = open("/sd/sample_data/tmp.sample", "r")
+        gc.collect()
+    except Exception as e:
+        logger.warning(f"Failed to open tmp sample file, exiting transmit mode: {e}")
+        return MODE_DEEPSLEEP
         
     gc.collect()
     
