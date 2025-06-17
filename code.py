@@ -27,7 +27,7 @@ CELLULAR                 = 1
 WIFI                     = 2
 DEBUG                    = 3
 
-COMMS_MODE               = DEBUG
+COMMS_MODE               = CELLULAR
 
 # ---------------------------------------------------------------------
 # TIMING CONFIGURATION
@@ -93,16 +93,19 @@ def measure_mode():
     
     sensors = ['attitudeboard.barometer', 'attitudeboard.imu', 'atlassenseboard.conductivity', 'atlassenseboard.dissolvedoxygen', 'atlassenseboard.watertemperature']
 
-    logger.info(manager.all_devices())
+    # logger.info(manager.all_devices())
     
     while samples_taken < SAMPLES:
         for sensor in sensors:
             all_readings = manager.devices[sensor].read()
             
             for r in all_readings.values(): 
-                logger.info(f"{sensor} - {r}")
-                dl.log_reading(r)
-                sample_readings.append(r)
+                if(r is not None):
+                    logger.info(f"{sensor} - {r}")
+                    dl.log_reading(r)
+                    sample_readings.append(r)
+                else:
+                    logger.warning(f"Reading from {sensor} was {r}")
     
         gc.collect()
         
@@ -158,12 +161,17 @@ def transmit_mode():
         start_time = time.monotonic()
         logger.info("Waiting for modem to warm up")
         
+        mqtt_client = None
+        
         while time.monotonic() - start_time < MODEM_RESPONSE_TIMEOUT:
             if boards.logicboard.CellularModem.is_comms_ready():
                 logger.info(f"Modem Comms Ready: {boards.logicboard.CellularModem.is_comms_ready()}")
-                logger.info(f"Setting up MQTT Connection")
+                logger.info(f"Setting up MQTT Connection") 
                 
-                mqtt_client = boards.logicboard.CellularModem.create_mqtt_connection(os.getenv("DEVICE_ID"), os.getenv("AWS_IOT_ENDPOINT"))
+                if(mqtt_client is None):
+                    logger.warning(f"MQTT client didn't initialize")
+                    mqtt_client = boards.logicboard.CellularModem.create_mqtt_connection(os.getenv("DEVICE_ID"), os.getenv("AWS_IOT_ENDPOINT"))
+                    continue
                 
                 if(not mqtt_client.is_open()):
                     mqtt_client.open()
@@ -194,9 +202,7 @@ def transmit_mode():
                 logger.info(f"Modem Comms Ready: {boards.logicboard.CellularModem.is_comms_ready()}")
                 
                 logger.info("Waiting for modem to be ready for comms")
-                time.sleep(1)
-                
-            
+                time.sleep(1)            
             
         else:
             logger.warning("Modem failed to establish comms link...")
@@ -205,6 +211,11 @@ def transmit_mode():
     elif(COMMS_MODE == WIFI):
         logger.warning(f"WiFi not currently supported")
         return MODE_DEEPSLEEP
+    
+    elif(COMMS_MODE == DEBUG):
+        logger.info(f"Debug comms mode")
+        return MODE_DEEPSLEEP
+    
     else:
         logger.warning(f"Invalid comms mode: {COMMS_MODE}")
         return MODE_DEEPSLEEP

@@ -13,7 +13,7 @@ class EZOEC(I2CDevice):
 
     def initialize_driver(self):
         base_device_driver = atlas_ezo_ec.EZO_EC(i2c_bus=self.i2c_bus, address=self.address)
-        base_device_driver.status()
+        base_device_driver.status
         return base_device_driver
         
     def deinitialize_device(self):
@@ -81,7 +81,7 @@ class EZODO(I2CDevice):
 
     def initialize_driver(self):
         base_device_driver = atlas_ezo_do.EZO_DO(i2c_bus=self.i2c_bus, address=self.address)
-        base_device_driver.status()
+        base_device_driver.status
         return base_device_driver
         
     def deinitialize_device(self):
@@ -129,7 +129,7 @@ class EZORTD(I2CDevice):
 
     def initialize_driver(self):
         base_device_driver = atlas_ezo_rtd.EZO_RTD(i2c_bus=self.i2c_bus, address=self.address)
-        base_device_driver.status()
+        base_device_driver.status
         return base_device_driver
         
     def deinitialize_device(self):
