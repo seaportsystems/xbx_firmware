@@ -162,8 +162,15 @@ class MQTT_Socket:
         logger.info("Closing socket")
         try:   
             #Check for open connections
-            if(self.is_connected()):
+            if (self.is_connected()):
+                logger.warning(f"Socket is still connected, attempting to disconnect")
                 self.disconnect()
+                
+            time.sleep(1)
+            
+            if(not self.is_open()):
+                logger.warning(f"Socket is already closed")
+                return True
                 
             #Try to open the connection
             response = self.modem.send_comm_get_response(f'AT+QMTCLOSE={self.socket_id}')
