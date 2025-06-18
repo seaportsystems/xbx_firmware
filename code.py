@@ -161,17 +161,16 @@ def transmit_mode():
         start_time = time.monotonic()
         logger.info("Waiting for modem to warm up")
         
-        mqtt_client = None
-        
         while time.monotonic() - start_time < MODEM_RESPONSE_TIMEOUT:
             if boards.logicboard.CellularModem.is_comms_ready():
                 logger.info(f"Modem Comms Ready: {boards.logicboard.CellularModem.is_comms_ready()}")
                 logger.info(f"Setting up MQTT Connection") 
                 
+                mqtt_client = boards.logicboard.CellularModem.create_mqtt_connection(os.getenv("DEVICE_ID"), os.getenv("AWS_IOT_ENDPOINT"))
+                
                 if(mqtt_client is None):
                     logger.warning(f"MQTT client didn't initialize")
-                    mqtt_client = boards.logicboard.CellularModem.create_mqtt_connection(os.getenv("DEVICE_ID"), os.getenv("AWS_IOT_ENDPOINT"))
-                    continue
+                    return MODE_DEEPSLEEP
                 
                 if(not mqtt_client.is_open()):
                     mqtt_client.open()
