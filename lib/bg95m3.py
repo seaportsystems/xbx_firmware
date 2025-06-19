@@ -20,7 +20,7 @@ class Status:
     UNKNOWN = 99
 
 class SSL_Context:
-    def __init__(self, modem, ssl_context_id=2):
+    def __init__(self, modem, ssl_context_id=2, sync_certs=False):
         self.modem = modem
         self.ssl_context_id = ssl_context_id
         self.sslversion = 4
@@ -35,14 +35,15 @@ class SSL_Context:
         self.ignorelocaltime = 1
         self.renegotiation = 0
         
-        logger.info("Syncing certs...")
-        try:
-            self.upload_cacert()
-            self.upload_device_cert()
-            self.upload_device_private_key()
-        except Exception as e:
-            logger.info(f"Failed to automatically sync certs")
-            logger.info("Try running: 'from helper_scripts import sync_certs' from the REPL")
+        if(sync_certs):
+            try:
+                logger.info("Syncing certs...")
+                self.upload_cacert()
+                self.upload_device_cert()
+                self.upload_device_private_key()
+            except Exception as e:
+                logger.info(f"Failed to automatically sync certs")
+                logger.info("Try running: 'from helper_scripts import sync_certs' from the REPL")
     
     def upload_cacert(self, new_ca_cert_path=os.getenv('CA_CERT_PATH')):
         #Delete old cacert.pem
@@ -110,10 +111,12 @@ class SSL_Context:
             return True
         
         elif(response['status_code'] == Status.ERROR):
-            logger.info("response")
-            raise RuntimeError(f'Error setting SSL parameter {key} to {value}: AT+QSSLCFG="{key}", {self.ssl_context_id}, {value}')
+            logger.info(f"{response}")
+            logger.warning(f'Error setting SSL parameter {key} to {value}: AT+QSSLCFG="{key}", {self.ssl_context_id}, {value}')
+        elif(response['status_code'] == Status.TIMEOUT):
+            logger.warning(f'Timeout... Error setting SSL parameter {key} to {value}: AT+QSSLCFG="{key}", {self.ssl_context_id}, {value}')
         else:
-            raise RuntimeError(f"Something else weird happened: {response}")
+            logger.warning(f"Something else weird happened: {response}")
             
 class MQTT_Socket:
     def __init__(self, modem, client_id, hostname, port, socket_id):
@@ -516,7 +519,7 @@ class BG95M3:
         gc.collect()
         
         logger.info("Setting Echo Mode to OFF")
-        self.send_comm_get_response("ATE0")
+        self.send_comm_get_response("ATE0") 
         
         gc.collect()
         

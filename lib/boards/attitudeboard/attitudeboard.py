@@ -23,27 +23,27 @@ class GPS(UARTDevice):
     def latlon(self):
         try:
             self.update()
-            return (self.base_device.latitude_degrees, self.base_device.longitude_degrees)
+            return Reading(tuple([self.base_device.latitude, self.base_device.longitude]), "degrees", "latlon")
         
         except Exception as e:
-            logger.warning(f"Failed to read {self.description}: {e}")
+            logger.warning(f"Failed to read latlon from {self.description}: {e}")
             return None
         
     @property
     def altitude(self):
         try:
             self.update()
-            return self.base_device.altitude_m
+            return Reading(self.base_device.altitude_m, "meters", "altitude")
         
         except Exception as e:
-            logger.warning(f"Failed to read {self.description}: {e}")
+            logger.warning(f"Failed to read altitude from {self.description}: {e}")
             return None
         
     @property
     def hdop(self):
         try:
             self.update()
-            return self.base_device.hdop
+            return Reading(self.base_device.hdop, "-", "hdop")
         
         except Exception as e:
             logger.warning(f"Failed to read {self.description}: {e}")
@@ -53,7 +53,7 @@ class GPS(UARTDevice):
     def sats(self):
         try:
             self.update()
-            return self.base_device.satellites
+            return Reading(self.base_device.satellites, "-", "sats")
         
         except Exception as e:
             logger.warning(f"Failed to read {self.description}: {e}")
@@ -63,7 +63,7 @@ class GPS(UARTDevice):
     def fix_quality(self):
         try:
             self.update()
-            return self.base_device.fix_quality
+            return Reading(self.base_device.fix_quality, "-", "fix_quality")
         
         except Exception as e:
             logger.warning(f"Failed to read {self.description}: {e}")
@@ -78,6 +78,8 @@ class GPS(UARTDevice):
         except Exception as e:
             logger.warning(f"Failed to update GPS data: {e}")
         
+        gc.collect()
+        
     def read(self):
         if self.enabled:
             readings = {}
@@ -87,10 +89,14 @@ class GPS(UARTDevice):
             readings['hdop'] = self.hdop
             readings['sv'] = self.sats
             
+            gc.collect()
+            
             return readings
         
         else:
             logger.warning(f"Device is disabled")
+            gc.collect()
+            
             return {}
         
 class IMU(I2CDevice):

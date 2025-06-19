@@ -91,7 +91,7 @@ def measure_mode():
     
     samples_taken = 0
     
-    sensors = ['attitudeboard.barometer', 'attitudeboard.imu', 'attitude.gps', 'atlassenseboard.conductivity', 'atlassenseboard.dissolvedoxygen', 'atlassenseboard.watertemperature']
+    sensors = ['attitudeboard.barometer', 'attitudeboard.imu', 'attitudeboard.gps', 'atlassenseboard.conductivity', 'atlassenseboard.dissolvedoxygen', 'atlassenseboard.watertemperature']
 
     # logger.info(manager.all_devices())
     
@@ -164,7 +164,9 @@ def transmit_mode():
         while time.monotonic() - start_time < MODEM_RESPONSE_TIMEOUT:
             if boards.logicboard.CellularModem.is_comms_ready():
                 logger.info(f"Modem Comms Ready: {boards.logicboard.CellularModem.is_comms_ready()}")
-                logger.info(f"Setting up MQTT Connection") 
+                logger.info(f"Setting up MQTT Connection")
+                
+                gc.collect()
                 
                 mqtt_client = boards.logicboard.CellularModem.create_mqtt_connection(os.getenv("DEVICE_ID"), os.getenv("AWS_IOT_ENDPOINT"))
                 
@@ -174,12 +176,15 @@ def transmit_mode():
                 
                 if(not mqtt_client.is_open()):
                     mqtt_client.open()
+                    gc.collect()
                 
                 if(not mqtt_client.is_connected()):
                     mqtt_client.connect()
+                    gc.collect()
                         
                 if(mqtt_client.is_connected()):
                     mqtt_client.publish(f"XBX/{os.getenv('DEVICE_ID')}/device", "Connected!")
+                    gc.collect()
 
                     for line in tmp_sample_file:
                         jsonline = loads(line)
