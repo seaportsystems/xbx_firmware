@@ -26,7 +26,7 @@ class EZOEC(I2CDevice):
     @property
     def EC(self):
         try:
-            return Reading(self.base_device.EC, "uS/cm", "salinity")
+            return Reading(self.base_device.EC, "uS/cm", "Salinity")
         
         except Exception as e:
                 logger.warning(f"Failed to read {self.description}: {e}")
@@ -36,7 +36,7 @@ class EZOEC(I2CDevice):
     @property
     def TDS(self):
         try:
-            return Reading(self.base_device.TDS, "tds", "salinity")
+            return Reading(self.base_device.TDS, "tds", "Salinity")
         
         except Exception as e:
                 logger.warning(f"Failed to read {self.description}: {e}")
@@ -46,7 +46,7 @@ class EZOEC(I2CDevice):
     @property
     def S(self):
         try:
-            return Reading(self.base_device.S, "S", "salinity")
+            return Reading(self.base_device.S, "S", "Salinity")
         
         except Exception as e:
                 logger.warning(f"Failed to read {self.description}: {e}")
@@ -56,7 +56,7 @@ class EZOEC(I2CDevice):
     @property
     def SG(self):
         try:
-            return Reading(self.base_device.SG, "SG", "salinity")
+            return Reading(self.base_device.SG, "SG", "Salinity")
         
         except Exception as e:
                 logger.warning(f"Failed to read {self.description}: {e}")
@@ -76,7 +76,7 @@ class EZOEC(I2CDevice):
         
 class EZODO(I2CDevice):
     def __init__(self, i2c_bus, address=97):
-        super().__init__(i2c_bus, address, description="dissolved oxygen")
+        super().__init__(i2c_bus, address, description="Dissolved Oxygen")
 
     def initialize_driver(self):
         base_device_driver = atlas_ezo_do.EZO_DO(i2c_bus=self.i2c_bus, address=self.address)
@@ -93,7 +93,7 @@ class EZODO(I2CDevice):
     @property
     def MGL(self):
         try:
-            return Reading(self.base_device.MGL, "mg/l", "dissolve oxgen")
+            return Reading(self.base_device.MGL, "mg/l", "Dissolved Oxygen")
         
         except Exception as e:
                 logger.warning(f"Failed to read {self.description}: {e}")
@@ -103,7 +103,7 @@ class EZODO(I2CDevice):
     @property
     def SAT(self):
         try:
-            return Reading(self.base_device.SAT, "%", "dissolved oxygen")
+            return Reading(self.base_device.SAT, "%", "Dissolved Oxygen")
         
         except Exception as e:
                 logger.warning(f"Failed to read {self.description}: {e}")
@@ -123,7 +123,7 @@ class EZODO(I2CDevice):
 
 class EZORTD(I2CDevice):
     def __init__(self, i2c_bus, address=102):
-        super().__init__(i2c_bus, address, description="water temperature")
+        super().__init__(i2c_bus, address, description="Sea Temperature")
 
     def initialize_driver(self):
         base_device_driver = atlas_ezo_rtd.EZO_RTD(i2c_bus=self.i2c_bus, address=self.address)
@@ -140,7 +140,7 @@ class EZORTD(I2CDevice):
     @property
     def T(self):
         try:
-            return Reading(self.base_device.T, "C", "water temperature")
+            return Reading(self.base_device.T, "C", "Sea Temperature")
         
         except Exception as e:
                 logger.warning(f"Failed to read {self.description}: {e}")

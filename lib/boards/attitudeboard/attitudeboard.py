@@ -23,7 +23,7 @@ class GPS(UARTDevice):
     def latlon(self):
         try:
             self.update()
-            return Reading(tuple([self.base_device.latitude, self.base_device.longitude]), "degrees", "latlon")
+            return Reading(tuple([self.base_device.latitude, self.base_device.longitude]), "degrees", "Location")
         
         except Exception as e:
             logger.warning(f"Failed to read latlon from {self.description}: {e}")
@@ -33,7 +33,7 @@ class GPS(UARTDevice):
     def altitude(self):
         try:
             self.update()
-            return Reading(self.base_device.altitude_m, "meters", "altitude")
+            return Reading(self.base_device.altitude_m, "meters", "Altitude")
         
         except Exception as e:
             logger.warning(f"Failed to read altitude from {self.description}: {e}")
@@ -43,7 +43,7 @@ class GPS(UARTDevice):
     def hdop(self):
         try:
             self.update()
-            return Reading(self.base_device.hdop, "-", "hdop")
+            return Reading(self.base_device.hdop, "-", "Horizontal Dilution of Precision")
         
         except Exception as e:
             logger.warning(f"Failed to read {self.description}: {e}")
@@ -53,7 +53,7 @@ class GPS(UARTDevice):
     def sats(self):
         try:
             self.update()
-            return Reading(self.base_device.satellites, "-", "sats")
+            return Reading(self.base_device.satellites, "-", "Satellites in View")
         
         except Exception as e:
             logger.warning(f"Failed to read {self.description}: {e}")
@@ -63,7 +63,7 @@ class GPS(UARTDevice):
     def fix_quality(self):
         try:
             self.update()
-            return Reading(self.base_device.fix_quality, "-", "fix_quality")
+            return Reading(self.base_device.fix_quality, "-", "Fix Quality")
         
         except Exception as e:
             logger.warning(f"Failed to read {self.description}: {e}")
@@ -232,7 +232,7 @@ class Barometer(I2CDevice):
     @property
     def pressure(self):
         try:
-            return Reading(self.base_device.pressure, "hPa", "Pressure")
+            return Reading(self.base_device.pressure, "hPa", "Ambient Pressure")
         
         except Exception as e:
             logger.warning(f"Failed to read {self.description}: {e}")

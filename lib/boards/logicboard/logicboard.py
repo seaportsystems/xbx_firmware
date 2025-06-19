@@ -22,7 +22,8 @@ class CPU(Device):
     @property
     def temperature(self):
         try:
-            return self.base_device.temperature
+            return Reading(self.base_device.temperature, "C", "CPU Temperature")
+        
         except Exception as e:
             logger.warning(f"Failed to read {self.description}: {e}")
             return None
