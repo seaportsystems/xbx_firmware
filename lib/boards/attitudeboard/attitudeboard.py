@@ -1,4 +1,4 @@
-# import adafruit_gps
+import adafruit_gps
 import adafruit_lps2x
 import adafruit_lsm9ds1
 import gc
@@ -6,27 +6,92 @@ gc.enable()
 
 from reading import Reading
 from services.global_logger import logger
-from services.device_manager import I2CDevice, manager
+from services.device_manager import UARTDevice, I2CDevice, manager
 
-# class GPS():
-#     def __init__(self, uart_bus):
-#         self.uart_bus = uart_bus
-#         self.base_device = adafruit_gps.GPS(self.uart_bus)
-        
-#     @property
-#     def latlon(self):
-#         return (self.base_device.latitude_degrees, self.base_device.longitude_degrees)
-        
-#     @property
-#     def hdop(self):
-#         return self.base_device.hdop
+class GPS(UARTDevice):
+    def __init__(self, uart_bus):
+        super().__init__(uart_bus, description="gps")
+
+    def initialize_driver(self):
+        base_device_driver = adafruit_gps.GPS(self.uart_bus)
+        return base_device_driver
     
-#     @property
-#     def sats(self):
-#         return self.base_device.satellites
+    def deinitialize_device(self):
+        return True
+        
+    @property
+    def latlon(self):
+        try:
+            self.update()
+            return (self.base_device.latitude_degrees, self.base_device.longitude_degrees)
+        
+        except Exception as e:
+            logger.warning(f"Failed to read {self.description}: {e}")
+            return None
+        
+    @property
+    def altitude(self):
+        try:
+            self.update()
+            return self.base_device.altitude_m
+        
+        except Exception as e:
+            logger.warning(f"Failed to read {self.description}: {e}")
+            return None
+        
+    @property
+    def hdop(self):
+        try:
+            self.update()
+            return self.base_device.hdop
+        
+        except Exception as e:
+            logger.warning(f"Failed to read {self.description}: {e}")
+            return None
     
-#     def update(self):
-#         self.base_device.update()
+    @property
+    def sats(self):
+        try:
+            self.update()
+            return self.base_device.satellites
+        
+        except Exception as e:
+            logger.warning(f"Failed to read {self.description}: {e}")
+            return None
+    
+    @property
+    def fix_quality(self):
+        try:
+            self.update()
+            return self.base_device.fix_quality
+        
+        except Exception as e:
+            logger.warning(f"Failed to read {self.description}: {e}")
+            return None
+    
+    def update(self, updates=10):
+        logger.info(f"Updating GPS data from buffer {updates} times")
+        try:
+            for _ in range(updates):  # drain a few messages per loop
+                self.base_device.update()
+                
+        except Exception as e:
+            logger.warning(f"Failed to update GPS data: {e}")
+        
+    def read(self):
+        if self.enabled:
+            readings = {}
+            
+            readings['location'] = self.latlon
+            readings['altitude'] = self.altitude
+            readings['hdop'] = self.hdop
+            readings['sv'] = self.sats
+            
+            return readings
+        
+        else:
+            logger.warning(f"Device is disabled")
+            return {}
         
 class IMU(I2CDevice):
     def __init__(self, i2c_bus, mag_address=28, xg_address=106):
@@ -200,6 +265,7 @@ class AttitudeBoard():
         manager.add_device("attitudeboard.barometer", Barometer(self.i2c_bus))
         logger.info("Adding imu to device manager")
         manager.add_device("attitudeboard.imu", IMU(self.i2c_bus))
-
-        # self.gps = GPS(self.uart_bus)
+        logger.info("Adding gps to device manager")
+        manager.add_device("attitudeboard.gps", GPS(self.uart_bus))
+        
         gc.collect()

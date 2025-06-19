@@ -92,18 +92,50 @@ class I2CDevice():
             self.enabled = False
 
 class UARTDevice():
-    def __init__(self):
-        pass
+    def __init__(self, uart_bus, description):
+        self.uart_bus = uart_bus
+        self.description = description
+        self.enabled = False
+        self.base_device = None
     
     def read(self):
         raise NotImplementedError("Subclasses must implement .read()")
     
     def enable(self):
-        raise NotImplementedError("Subclasses must implement .enable()")
+        logger.info(f"Enabling {self.description}")
+        try:
+            self.base_device = self.initialize_driver()
+                
+            if self.base_device:
+                logger.info(f"Successfully enabled {self.description}")
+                self.enabled = True
+            else:
+                logger.warning(f"Failed to enable {self.description}: base device driver is None")
+                self.enabled = False
+            
+        except Exception as e:
+            logger.warning(f"Failed to enable {self.description}: {e}")
+            self.base_device = None
+            self.enabled = False
     
     def disable(self):
-        raise NotImplementedError("Subclasses must implement .disable()")
-    
+        logger.info(f"Disabling {self.description}")
+        
+        try:
+            deinitialized = self.deinitialize_device()
+                
+            if deinitialized:
+                logger.info(f"Successfully deinitialized {self.description}")
+                self.base_device = None
+                self.enabled = False
+            else:
+                logger.warning(f"Failed to disable {self.description}")       
+            
+        except Exception as e:
+            logger.warning(f"Failed to enable {self.description}: {e}")
+            self.base_device = None
+            self.enabled = False
+            
 class DeviceManager():
     def __init__(self):
         self.devices = {}

@@ -91,7 +91,7 @@ def measure_mode():
     
     samples_taken = 0
     
-    sensors = ['attitudeboard.barometer', 'attitudeboard.imu', 'atlassenseboard.conductivity', 'atlassenseboard.dissolvedoxygen', 'atlassenseboard.watertemperature']
+    sensors = ['attitudeboard.barometer', 'attitudeboard.imu', 'attitude.gps', 'atlassenseboard.conductivity', 'atlassenseboard.dissolvedoxygen', 'atlassenseboard.watertemperature']
 
     # logger.info(manager.all_devices())
     
