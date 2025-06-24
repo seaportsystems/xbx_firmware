@@ -28,6 +28,6 @@ try:
     rtc_instance = manager.devices['logicboard.rtc']
     rtc_instance.datetime = ntp_instance.datetime
     current_time = rtc_instance.datetime
-    print(f"Successfully set device RTC to: {current_time.tm_hour:02d} :{current_time.tm_min:02d}:{current_time.tm_sec:02d}")
+    print(f"Successfully set device RTC to: {current_time.tm_year:04d}{current_time.tm_mon:02d}{current_time.tm_mday:02d}{current_time.tm_hour:02d} {current_time.tm_min:02d}:{current_time.tm_sec:02d}")
 except Exception as e:
     print(f"Failed to sync time wtih NTP server: {e}")
