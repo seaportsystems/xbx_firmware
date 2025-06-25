@@ -69,8 +69,17 @@ class GPS(UARTDevice):
             logger.warning(f"Failed to read {self.description}: {e}")
             return None
     
+    @property
+    def has_fix(self):
+        fix_quality = self.fix_quality
+        
+        if fix_quality.value > 0:
+            return True
+        else:
+            return False
+        
     def update(self, updates=10):
-        logger.info(f"Updating GPS data from buffer {updates} times")
+        # logger.info(f"Updating GPS data from buffer {updates} times")
         try:
             for _ in range(updates):  # drain a few messages per loop
                 self.base_device.update()

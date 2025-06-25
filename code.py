@@ -4,6 +4,7 @@ from watchdog import WatchDogMode
 watchdog.timeout = 8
 watchdog.mode = None
 
+import alarm
 import boards
 from json import dumps, loads
 import os
@@ -44,19 +45,49 @@ SAMPLES                  = 1
 SAMPLE_WINDOW_DURATION   = 5   # seconds to collect high-res data
 SAMPLE_FREQ              = 5   # hz - how frequently samples are taken
 SAMPLE_INTERVAL          = 1 / SAMPLE_FREQ
+WARMUP_DURATION          = 5
 MODEM_RESPONSE_TIMEOUT   = 5   # seconds to wait for modem “OK” response
 DEEPSLEEP_DURATION       = 5   # seconds to sleep between cycles
 
 # ---------------------------------------------------------------------
 # STATE DEFINITIONS
 # ---------------------------------------------------------------------
-MODE_MEASURE   = 0
-MODE_TRANSMIT  = 1
-MODE_DEEPSLEEP = 2
+MODE_WARMUP    = 0
+MODE_MEASURE   = 1
+MODE_TRANSMIT  = 2
+MODE_DEEPSLEEP = 3
 
 # ---------------------------------------------------------------------
 # MODE IMPLEMENTATIONS (each returns the next mode)
 # ---------------------------------------------------------------------
+def warmup_mode():
+    """
+        Power on all devices, and wait for either WARMUP_DURATION or until modem and GPS are ready
+    """
+    logger.info(f"Entering warmup mode. Waiting either {WARMUP_DURATION} seconds or for fixes and connectivity on both Cellular Modem and GPS")
+    start_time = time.monotonic()
+    
+    gps_ready = False
+    modem_ready = False
+    
+    gps = manager.devices['attitudeboard.gps']
+    modem = boards.logicboard.CellularModem
+    
+    while time.monotonic() - start_time < WARMUP_DURATION:
+        gps_ready = gps.has_fix
+        modem_ready = modem.is_comms_ready()
+        
+        if((gps_ready == True) and (modem_ready == True)):
+            logger.info(f"GPS and Modem are ready, entering Measure Mode")
+            break
+        else:
+            logger.info(f"GPS   Ready: {gps_ready}")
+            logger.info(f"Modem Ready: {modem_ready}")
+            time.sleep(1)
+    else:
+        logger.info(f"GPS and modem are not ready, entering Measure Mode")    
+        
+    return MODE_MEASURE
 
 def measure_mode():
     """
@@ -132,7 +163,7 @@ def measure_mode():
     
     return MODE_TRANSMIT
 
-
+    
 def transmit_mode():
     """
         Power on modem and wait up to MODEM_RESPONSE_TIMEOUT seconds
@@ -241,21 +272,26 @@ def deepsleep_mode():
     """
     # ›› power off sensors and modem (placeholder)
     logger.info("Entering Deep Sleep Mode")
-    time.sleep(DEEPSLEEP_DURATION)
     
     # After waking up, go back to MEASURE
-    return MODE_MEASURE
-
+    # time_alarm = alarm.time.TimeAlarm(monotonic_time = time.monotonic() + DEEPSLEEP_DURATION)
+    # alarm.exit_and_deep_sleep_until_alarms(time_alarm)
+    time.sleep(DEEPSLEEP_DURATION)
+    return MODE_WARMUP
+    
+    
 # ---------------------------------------------------------------------
 # MAIN LOOP
 # ---------------------------------------------------------------------
 def main():
-    current_mode = MODE_MEASURE
+    current_mode = MODE_WARMUP
 
     while True:
-        if current_mode == MODE_MEASURE:
+        if current_mode == MODE_WARMUP:
+            current_mode = warmup_mode()
+        
+        elif current_mode == MODE_MEASURE:
             current_mode = measure_mode()
-            logger.info(f"Exited Measure Mode")
         
         elif current_mode == MODE_TRANSMIT:
             current_mode = transmit_mode()
